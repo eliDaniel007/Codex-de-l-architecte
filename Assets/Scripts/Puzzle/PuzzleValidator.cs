@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Codex.Puzzle
@@ -147,6 +148,53 @@ namespace Codex.Puzzle
                 code = code.Replace($"___GAP_{kvp.Key}___", kvp.Value);
             }
             return code;
+        }
+
+        public static ValidationResult ValidateFreeWrite(PuzzleDefinition puzzle, string playerCode)
+        {
+            var result = new ValidationResult
+            {
+                IsSuccess = true,
+                GapResults = new List<GapResult>()
+            };
+
+            if (puzzle == null || puzzle.requiredPatterns == null || puzzle.requiredPatterns.Count == 0)
+            {
+                result.IsSuccess = false;
+                result.Message = "Puzzle invalide.";
+                return result;
+            }
+
+            string code = playerCode ?? "";
+            int correct = 0;
+
+            for (int i = 0; i < puzzle.requiredPatterns.Count; i++)
+            {
+                var pat = puzzle.requiredPatterns[i];
+                bool match = false;
+                try { match = Regex.IsMatch(code, pat.pattern); }
+                catch { }
+
+                var gr = new GapResult
+                {
+                    GapIndex = i,
+                    Label = pat.description,
+                    IsCorrect = match,
+                    Message = match ? pat.successMessage : pat.failureMessage,
+                    PlayerAnswer = match ? "OK" : "manquant"
+                };
+                result.GapResults.Add(gr);
+                if (match) correct++;
+                else result.IsSuccess = false;
+            }
+
+            result.CorrectCount = correct;
+            result.TotalCount = puzzle.requiredPatterns.Count;
+            result.Score = puzzle.requiredPatterns.Count > 0
+                ? (float)correct / puzzle.requiredPatterns.Count : 0f;
+            result.Message = result.IsSuccess
+                ? puzzle.successMessage : puzzle.failureMessage;
+            return result;
         }
     }
 

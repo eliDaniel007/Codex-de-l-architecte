@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6262859ba65053a448f7fda10e4c91ea, type: 3}
+  m_Name: IntroDialogue
+  m_EditorClassIdentifier: Assembly-CSharp::Codex.Dialogue.DialogueData
+  dialogueId: intro
+  lines:
+  - speakerName: ???
+    portrait: {fileID: 0}
+    text: ...
+    letterDelay: 0.08
+    voiceClip: {fileID: 0}
+    waitForInput: 1
+  - speakerName: Systeme
+    portrait: {fileID: 0}
+    text: Initialisation du protocole de secours... Connexion etablie.
+    letterDelay: 0.03
+    voiceClip: {fileID: 0}
+    waitForInput: 1
+  - speakerName: Systeme
+    portrait: {fileID: 0}
+    text: Bienvenue, Architecte. Arcadia, notre cite numerique, a ete corrompue par
+      un virus.
+    letterDelay: 0.03
+    voiceClip: {fileID: 0}
+    waitForInput: 1
+  - speakerName: C-Sharp
+    portrait: {fileID: 0}
+    text: Salut ! Je suis C-Sharp, ton drone compagnon. Je serai ton guide dans cette
+      mission !
+    letterDelay: 0.03
+    voiceClip: {fileID: 0}
+    waitForInput: 1
+  - speakerName: C-Sharp
+    portrait: {fileID: 0}
+    text: Pour reparer Arcadia, tu devras maitriser le langage C#. Chaque zone cache
+      des terminaux de code a resoudre.
+    letterDelay: 0.03
+    voiceClip: {fileID: 0}
+    waitForInput: 1
+  - speakerName: C-Sharp
+    portrait: {fileID: 0}
+    text: Approche-toi d'un terminal et appuie sur [E] pour commencer. Je t'expliquerai
+      chaque concept !
+    letterDelay: 0.03
+    voiceClip: {fileID: 0}
+    waitForInput: 1
+  - speakerName: C-Sharp
+    portrait: {fileID: 0}
+    text: Commencons par le Temple des Variables. Suis-moi !
+    letterDelay: 0.03
+    voiceClip: {fileID: 0}
+    waitForInput: 1

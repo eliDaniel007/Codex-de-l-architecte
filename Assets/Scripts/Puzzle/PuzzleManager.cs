@@ -58,7 +58,7 @@ namespace Codex.Puzzle
             tabManager?.ClearAllTabs();
 
             // Display the template code with highlighted gap markers (read-only)
-            string displayCode = CodeEditor.SyntaxHighlighter.HighlightWithGaps(puzzle.templateCode);
+            string displayCode = SyntaxHighlighter.HighlightWithGaps(puzzle.templateCode);
             tabManager?.OpenTab(
                 "main",
                 GetFileNameForConcept(puzzle.concept),

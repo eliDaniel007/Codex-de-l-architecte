@@ -42,6 +42,12 @@ namespace Codex.Puzzle
         [Tooltip("Indices progressifs donnés par le drone C-Sharp")]
         public List<string> hints = new List<string>();
 
+        [Header("Free Write (Phase CREER)")]
+        public bool isFreeWrite;
+        [TextArea(3, 6)]
+        public string instructions;
+        public List<CodePattern> requiredPatterns = new List<CodePattern>();
+
         [Header("Feedback")]
         [TextArea(2, 3)]
         public string successMessage = "Compilation réussie !";
@@ -111,5 +117,14 @@ namespace Codex.Puzzle
         Dropdown,
         DragDrop,
         Toggle
+    }
+
+    [Serializable]
+    public class CodePattern
+    {
+        public string description;
+        public string pattern;
+        public string successMessage;
+        public string failureMessage;
     }
 }
