@@ -1,0 +1,14 @@
+{
+    "name": "Elisenyo22.Comunityaiassistant.Editor.Tests",
+    "references": [
+        "Elisenyo22.Comunityaiassistant.Editor",
+        "Elisenyo22.Comunityaiassistant"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}

@@ -1,0 +1,10 @@
+{
+    "name": "Elisenyo22.Comunityaiassistant.Editor",
+    "references": [
+      "Elisenyo22.Comunityaiassistant"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}

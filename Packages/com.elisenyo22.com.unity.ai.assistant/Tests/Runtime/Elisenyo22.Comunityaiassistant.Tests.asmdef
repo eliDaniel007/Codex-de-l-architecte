@@ -1,0 +1,11 @@
+{
+    "name": "Elisenyo22.Comunityaiassistant.Tests",
+    "references": [
+        "Elisenyo22.Comunityaiassistant"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": []
+}
