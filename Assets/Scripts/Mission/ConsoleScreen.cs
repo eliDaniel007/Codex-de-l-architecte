@@ -57,11 +57,10 @@ public class ConsoleScreen : MonoBehaviour
         var held = _holder.HeldItem;
         var db   = held != null ? held.GetComponent<DataBox>() : null;
 
+        // Dès qu'on entre dans le périmètre de l'écran avec une box en main,
+        // on dépose automatiquement (plus de bouton E).
         if (db != null)
-        {
-            PromptUI.Show("[E] Déposer sur l'écran");
-            if (AppuyeE()) Afficher(held, db);
-        }
+            Afficher(held, db);
     }
 
     void Afficher(PickupItem item, DataBox db)
@@ -70,6 +69,7 @@ public class ConsoleScreen : MonoBehaviour
         item.OnDropped();
         Destroy(item.gameObject);
         GameState.I.ConsommerPourEcran();
+        GameState.I.CompleterSiKind(QuestKind.Affichage); // valide la quête « afficher »
         PromptUI.Hide();
 
         if (_screenText != null)
@@ -109,16 +109,7 @@ public class ConsoleScreen : MonoBehaviour
         tmp.rectTransform.sizeDelta = new Vector2(110f, 65f);
         
         root.SetActive(false); // Caché par défaut
-        
-        return tmp;
-    }
 
-    static bool AppuyeE()
-    {
-#if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
-#else
-        return Input.GetKeyDown(KeyCode.E);
-#endif
+        return tmp;
     }
 }

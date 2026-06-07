@@ -307,7 +307,7 @@ public class ClavierSceneController : MonoBehaviour
         _ligneSaisie.fontSize  = 48f;
         _ligneSaisie.alignment = TextAlignmentOptions.Left;
         _ligneSaisie.fontStyle = FontStyles.Bold;
-        _ligneSaisie.richText  = true;
+        _ligneSaisie.richText  = false; // affiche le texte tapé tel quel (pas de HTML)
         var lr = ligneGO.GetComponent<RectTransform>();
         lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
         lr.offsetMin = new Vector2(20, 0); lr.offsetMax = new Vector2(-20, 0);
@@ -339,15 +339,8 @@ public class ClavierSceneController : MonoBehaviour
     void ActualiserLigne()
     {
         if (_ligneSaisie == null) return;
-
-        string display = _buffer;
-        // Colorisation syntaxique légère (mode normal surtout)
-        display = Regex.Replace(display, @"\b(int|float|string|bool|char)\b", "<color=#569CD6>$1</color>");
-        display = Regex.Replace(display, @"\b(true|false)\b", "<color=#569CD6>$1</color>");
-        display = Regex.Replace(display, @"\b(Console\.WriteLine)\b", "<color=#DCDCAA>$1</color>");
-        display = Regex.Replace(display, @"([=;\(\)\+\-\*/])", "<color=#888>$1</color>");
-
-        _ligneSaisie.text = display + "<color=#569CD6>|</color>";
+        // Texte brut, pas de balises rich text : ce que tu tapes s'affiche tel quel.
+        _ligneSaisie.text = _buffer + "|";
     }
 
     void Erreur(string msg)

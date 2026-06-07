@@ -83,7 +83,7 @@ public class CPUSceneController : MonoBehaviour
             ? "  <size=70%><color=#FFD27F>(réponds au clavier)</color></size>"
             : "";
         string sousTitre = active != null
-            ? $"Objectif actuel : <color=#00D9FF>{active.description}</color>{indice}"
+            ? $"Objectif actuel : <color=#00D9FF>{active.titre}</color>{indice}"
             : "<color=#73D973>Tous les objectifs sont terminés !</color>";
         AjouterTexte(canvasGO.transform, sousTitre,
             new Vector2(0.1f, 0.75f), new Vector2(0.9f, 0.83f), 28f, new Color(0.85f, 0.9f, 1f),
@@ -107,12 +107,12 @@ public class CPUSceneController : MonoBehaviour
         var listGO = new GameObject("ListeQuetes");
         listGO.transform.SetParent(parent, false);
         var lr = listGO.AddComponent<RectTransform>();
-        lr.anchorMin = new Vector2(0.18f, 0.22f);
-        lr.anchorMax = new Vector2(0.82f, 0.72f);
+        lr.anchorMin = new Vector2(0.15f, 0.20f);
+        lr.anchorMax = new Vector2(0.85f, 0.72f);
         lr.offsetMin = lr.offsetMax = Vector2.zero;
 
         var vlg = listGO.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing            = 14f;
+        vlg.spacing            = 12f;
         vlg.childAlignment     = TextAnchor.UpperLeft;
         vlg.childControlHeight  = true;
         vlg.childControlWidth   = true;
@@ -130,7 +130,7 @@ public class CPUSceneController : MonoBehaviour
             else if (estActive)  { puce = "<color=#00D9FF>></color>";   couleur = colorActive; }
             else                 { puce = "<color=#8C99B3>-</color>";   couleur = colorPending; }
 
-            string ligne = $"{puce}  <b>{q.titre}</b>\n<size=80%>     {q.description}</size>";
+            string ligne = $"{puce}  <b>{q.titre}</b>\n<size=78%><color=#AEB9CC>{q.description}</color></size>";
             AjouterLigneQuete(listGO.transform, ligne, couleur, estActive);
         }
     }
@@ -144,19 +144,19 @@ public class CPUSceneController : MonoBehaviour
         bg.color = surligne ? new Color(0f, 0.85f, 1f, 0.12f) : new Color(1f, 1f, 1f, 0.03f);
 
         var le = go.AddComponent<LayoutElement>();
-        le.minHeight = 64f;
+        le.minHeight = 110f;
 
         var txtGO = new GameObject("Txt");
         txtGO.transform.SetParent(go.transform, false);
         var tmp = txtGO.AddComponent<TextMeshProUGUI>();
-        tmp.text      = texte;
-        tmp.fontSize  = 26f;
-        tmp.color     = couleur;
-        tmp.richText  = true;
-        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+        tmp.text       = texte;
+        tmp.fontSize   = 22f;
+        tmp.color      = couleur;
+        tmp.richText   = true;
+        tmp.alignment  = TextAlignmentOptions.TopLeft;
         var tr = txtGO.GetComponent<RectTransform>();
         tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-        tr.offsetMin = new Vector2(20f, 6f); tr.offsetMax = new Vector2(-20f, -6f);
+        tr.offsetMin = new Vector2(20f, 10f); tr.offsetMax = new Vector2(-20f, -10f);
     }
 
     // ── helpers UI ────────────────────────────────────────────────────────

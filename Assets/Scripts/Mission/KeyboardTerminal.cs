@@ -3,12 +3,13 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Pose ce script sur le modèle du clavier dans MainScene.
-/// Le PÉRIMÈTRE est défini par le Collider (trigger) attaché au clavier :
-/// dès que le joueur entre dans ce collider, la scène Clavier se charge.
-/// Plus de bouton [E]. Pour ajuster la zone, redimensionne le Box Collider
-/// du clavier dans l'éditeur.
+/// Détection par DISTANCE HORIZONTALE (la hauteur Y est ignorée), car le
+/// clavier est posé en hauteur : un collider physique flotterait au-dessus
+/// du sol et le joueur n'entrerait jamais dedans.
+///
+/// Le périmètre = un cercle de rayon 'triggerRadius' autour du clavier,
+/// visible via le gizmo cyan. Ajuste 'triggerRadius' pour le coller au clavier.
 /// </summary>
-[RequireComponent(typeof(Collider))]
 public class KeyboardTerminal : MonoBehaviour
 {
     [Header("Scène")]
@@ -16,55 +17,82 @@ public class KeyboardTerminal : MonoBehaviour
     public string clavierSceneName = "Clavier";
     [Tooltip("Tag du joueur (StarterAssets : 'Player').")]
     public string playerTag = "Player";
-    [Tooltip("Force le Collider attaché à devenir trigger au démarrage.")]
-    public bool   forceTrigger = true;
 
-    private Collider _col;
-    private bool     _armed = true;
+    [Header("Périmètre")]
+    [Tooltip("Rayon (en mètres) autour du clavier pour entrer. Règle-le avec le gizmo.")]
+    public float triggerRadius = 2.5f;
+    [Tooltip("Ignore la différence de hauteur (Y) joueur/clavier. À garder coché ici.")]
+    public bool  ignorerHauteur = true;
+    [Tooltip("Logs de distance dans la Console (pour calibrer le rayon).")]
+    public bool  debug = true;
+
+    private Transform _player;
+    private bool      _armed = true;
+    private float     _nextLog;
 
     void Start()
     {
-        _col = GetComponent<Collider>();
-        if (forceTrigger)
-            foreach (var c in GetComponents<Collider>()) c.isTrigger = true;
+        TrouverJoueur();
 
-        // Si le joueur est DÉJÀ dans le périmètre au chargement (ex: on revient
-        // du clavier), on désarme jusqu'à ce qu'il en sorte → pas de re-entrée
-        // immédiate en boucle.
-        var pg = GameObject.FindGameObjectWithTag(playerTag);
-        if (pg != null && _col != null && _col.bounds.Contains(pg.transform.position))
+        // Si on revient juste du clavier en étant déjà dans la zone, on désarme
+        // jusqu'à ce qu'on s'éloigne (évite la re-entrée en boucle).
+        if (_player != null && DistanceAuJoueur() <= triggerRadius)
             _armed = false;
 
-        Debug.Log($"[KeyboardTerminal] Prêt sur '{name}'. Périmètre = collider. Cible : '{clavierSceneName}'.");
+        Debug.Log($"[KeyboardTerminal] Prêt sur '{name}' à {transform.position}. Rayon {triggerRadius} m. Cible : '{clavierSceneName}'.");
     }
 
-    void OnTriggerEnter(Collider other)
+    void TrouverJoueur()
     {
-        if (!_armed || !other.CompareTag(playerTag)) return;
-        EntrerClavier();
+        var pg = GameObject.FindGameObjectWithTag(playerTag);
+        if (pg != null) _player = pg.transform;
     }
 
-    void OnTriggerExit(Collider other)
+    void Update()
     {
-        // Le joueur quitte le périmètre → on ré-arme.
-        if (other.CompareTag(playerTag)) _armed = true;
+        if (_player == null) { TrouverJoueur(); if (_player == null) return; }
+
+        float dist = DistanceAuJoueur();
+
+        if (debug && Time.time >= _nextLog)
+        {
+            _nextLog = Time.time + 1f;
+            Debug.Log($"[KeyboardTerminal] distance joueur = {dist:0.0} m (rayon {triggerRadius} m, armé={_armed})");
+        }
+
+        if (!_armed)
+        {
+            if (dist > triggerRadius * 1.5f) _armed = true;   // hystérésis
+            return;
+        }
+
+        if (dist <= triggerRadius)
+            EntrerClavier();
+    }
+
+    float DistanceAuJoueur()
+    {
+        Vector3 a = _player.position;
+        Vector3 b = transform.position;
+        if (ignorerHauteur) { a.y = 0f; b.y = 0f; }
+        return Vector3.Distance(a, b);
     }
 
     void EntrerClavier()
     {
         _armed = false;
         GameState.I.clavierJustVisited = true;
-        Debug.Log($"[KeyboardTerminal] Joueur dans le périmètre → chargement de '{clavierSceneName}'");
+        Debug.Log($"[KeyboardTerminal] Joueur à portée → chargement de '{clavierSceneName}'");
         SceneManager.LoadScene(clavierSceneName);
     }
 
     void OnDrawGizmos()
     {
-        var col = GetComponent<Collider>();
-        if (col == null) return;
-        Gizmos.color = new Color(0f, 1f, 1f, 0.18f);
-        Gizmos.DrawCube(col.bounds.center, col.bounds.size);
         Gizmos.color = new Color(0f, 1f, 1f, 0.9f);
-        Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
+        Gizmos.DrawWireSphere(transform.position, triggerRadius);
+        // disque au sol pour visualiser le périmètre horizontal réel
+        Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
+        Vector3 sol = new Vector3(transform.position.x, 0f, transform.position.z);
+        Gizmos.DrawWireSphere(sol, triggerRadius);
     }
 }
