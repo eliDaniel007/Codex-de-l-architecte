@@ -7,11 +7,10 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public enum QuestKind
 {
-    Tache,        // validée ailleurs (scénario...)
+    Tache,        // validée ailleurs (RAM, scénario...)
     Declaration,  // validée en déclarant une variable au clavier
     Question,     // validée en répondant correctement au clavier
-    Affichage,    // validée en déposant une variable sur l'écran de la console
-    Rangement     // validée en déposant une variable dans une case de la RAM
+    Affichage     // validée en déposant une variable sur l'écran de la console
 }
 
 /// <summary>
@@ -52,26 +51,6 @@ public class Quest
 }
 
 /// <summary>
-/// Une cellule de RAM : vide, ou contenant une variable.
-/// </summary>
-[System.Serializable]
-public class RamSlot
-{
-    public bool     filled;
-    public string   variable = "";
-    public string   value    = "";
-    public string   type     = "int";
-    public Color    color    = Color.white;
-    public Material material;
-
-    public void Vider()
-    {
-        filled = false; variable = ""; value = ""; type = "int";
-        color = Color.white; material = null;
-    }
-}
-
-/// <summary>
 /// État global qui survit aux changements de scène.
 /// Singleton auto-créé au premier accès. Traverse Main ↔ Clavier ↔ RAM ↔ CPU.
 /// </summary>
@@ -99,11 +78,13 @@ public class GameState : MonoBehaviour
     public Material boxMaterialAsset; // On stocke le matériau d'origine
     public bool     boxExists;     // une box logique existe (sol, main, en transit)
 
-    [Header("RAM (multi-cellules)")]
-    [Tooltip("Contenu des cases de la RAM. Rempli dynamiquement selon le nombre de cases de la scène.")]
-    public List<RamSlot> ramSlots = new List<RamSlot>();
-    [Tooltip("Vrai juste après être sorti de la scène RAM (anti-boucle de re-entrée).")]
-    public bool ramJustVisited;
+    [Header("RAM")]
+    public bool     ramFilled;
+    public string   ramVariable = "";
+    public string   ramValue    = "";
+    public string   ramType     = "int";
+    public Color    ramColor    = Color.white;
+    public Material ramMaterial;
 
     [Header("CPU — Quêtes")]
     [Tooltip("Liste des objectifs. La quête active est celle à l'index 'questIndex'.")]
@@ -161,8 +142,8 @@ public class GameState : MonoBehaviour
             "14"));
         quests.Add(new Quest(
             "3. Stocker une variable en RAM",
-            "Déclare une variable au clavier, approche la RAM, puis clique une case vide pour y déposer la box.",
-            QuestKind.Rangement));
+            "Déclare une variable au clavier, puis dépose la box dans la RAM.",
+            QuestKind.Tache));
     }
 
     /// <summary>Quête actuellement active (ou null si toutes terminées).</summary>
@@ -216,57 +197,42 @@ public class GameState : MonoBehaviour
         if (boxExists) needsSpawn = true;
     }
 
-    // ── RAM multi-cellules ────────────────────────────────────────────────
+    // ── RAM (un seul emplacement) ─────────────────────────────────────────
 
-    /// <summary>Garantit que la liste de cases a au moins 'count' éléments.</summary>
-    public void EnsureRamSlots(int count)
+    public void DeposerEnRam()
     {
-        if (ramSlots == null) ramSlots = new List<RamSlot>();
-        while (ramSlots.Count < count) ramSlots.Add(new RamSlot());
+        ramFilled   = true;
+        ramVariable = boxVariable;
+        ramValue    = boxValue;
+        ramType     = boxType;
+        ramColor    = boxColor;
+        ramMaterial = boxMaterialAsset;
+
+        boxExists   = false;
+        boxVariable = "";
+        boxValue    = "";
     }
 
-    /// <summary>Dépose la box tenue en main dans la case i (qui doit être vide).</summary>
-    public bool DeposerDansCase(int i)
+    /// <summary>
+    /// Le joueur reprend la box stockée dans la RAM. Au prochain Main load,
+    /// le cube apparaît directement dans sa main.
+    /// </summary>
+    public void PrendreDansRam()
     {
-        if (!boxExists) return false;
-        if (i < 0 || i >= ramSlots.Count) return false;
-        if (ramSlots[i].filled) return false;
+        if (!ramFilled) return;
 
-        var s = ramSlots[i];
-        s.filled   = true;
-        s.variable = boxVariable;
-        s.value    = boxValue;
-        s.type     = boxType;
-        s.color    = boxColor;
-        s.material = boxMaterialAsset;
-
-        // La box quitte la main : plus rien à régénérer.
-        boxExists       = false;
-        boxVariable     = "";
-        boxValue        = "";
-        needsSpawn      = false;
-        spawnDansLaMain = false;
-        return true;
-    }
-
-    /// <summary>Reprend la box de la case i en main (cube régénéré au prochain Main load).</summary>
-    public bool PrendreDeCase(int i)
-    {
-        if (i < 0 || i >= ramSlots.Count) return false;
-        if (!ramSlots[i].filled) return false;
-
-        var s = ramSlots[i];
-        boxVariable      = s.variable;
-        boxValue         = s.value;
-        boxType          = s.type;
-        boxColor         = s.color;
-        boxMaterialAsset = s.material;
+        boxVariable      = ramVariable;
+        boxValue         = ramValue;
+        boxType          = ramType;
+        boxColor         = ramColor;
+        boxMaterialAsset = ramMaterial;
         boxExists        = true;
         needsSpawn       = true;
         spawnDansLaMain  = true;
 
-        s.Vider();
-        return true;
+        ramFilled   = false;
+        ramVariable = "";
+        ramValue    = "";
     }
 
     /// <summary>
