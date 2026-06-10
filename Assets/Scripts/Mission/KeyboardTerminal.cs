@@ -24,7 +24,7 @@ public class KeyboardTerminal : MonoBehaviour
     [Tooltip("Ignore la différence de hauteur (Y) joueur/clavier. À garder coché ici.")]
     public bool  ignorerHauteur = true;
     [Tooltip("Logs de distance dans la Console (pour calibrer le rayon).")]
-    public bool  debug = true;
+    public bool  debug = false;
 
     private Transform _player;
     private bool      _armed = true;

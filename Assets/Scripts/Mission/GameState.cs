@@ -7,10 +7,11 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public enum QuestKind
 {
-    Tache,        // validée ailleurs (RAM, scénario...)
+    Tache,        // validée ailleurs (scénario...)
     Declaration,  // validée en déclarant une variable au clavier
     Question,     // validée en répondant correctement au clavier
-    Affichage     // validée en déposant une variable sur l'écran de la console
+    Affichage,    // validée en déposant une variable sur l'écran de la console
+    Rangement     // validée en déposant une variable dans la RAM
 }
 
 /// <summary>
@@ -51,6 +52,26 @@ public class Quest
 }
 
 /// <summary>
+/// Une case de RAM (une boîte sur les tablettes) : vide ou contenant une variable.
+/// </summary>
+[System.Serializable]
+public class RamSlot
+{
+    public bool     filled;
+    public string   variable = "";
+    public string   value    = "";
+    public string   type     = "int";
+    public Color    color    = Color.white;
+    public Material material;
+
+    public void Vider()
+    {
+        filled = false; variable = ""; value = ""; type = "int";
+        color = Color.white; material = null;
+    }
+}
+
+/// <summary>
 /// État global qui survit aux changements de scène.
 /// Singleton auto-créé au premier accès. Traverse Main ↔ Clavier ↔ RAM ↔ CPU.
 /// </summary>
@@ -85,6 +106,10 @@ public class GameState : MonoBehaviour
     public string   ramType     = "int";
     public Color    ramColor    = Color.white;
     public Material ramMaterial;
+
+    [Header("RAM — cases multiples (boîtes sur les tablettes)")]
+    [Tooltip("Contenu des cases. Dimensionné automatiquement par la scène RAM.")]
+    public List<RamSlot> ramSlots = new List<RamSlot>();
 
     [Header("CPU — Quêtes")]
     [Tooltip("Liste des objectifs. La quête active est celle à l'index 'questIndex'.")]
@@ -143,7 +168,7 @@ public class GameState : MonoBehaviour
         quests.Add(new Quest(
             "3. Stocker une variable en RAM",
             "Déclare une variable au clavier, puis dépose la box dans la RAM.",
-            QuestKind.Tache));
+            QuestKind.Rangement));
     }
 
     /// <summary>Quête actuellement active (ou null si toutes terminées).</summary>
@@ -195,6 +220,62 @@ public class GameState : MonoBehaviour
     {
         // Si une box logique existait, on demande à Main de la régénérer
         if (boxExists) needsSpawn = true;
+    }
+
+    // ── RAM multi-cases (boîtes des tablettes) ────────────────────────────
+
+    /// <summary>Garantit que la liste de cases a au moins 'count' éléments.</summary>
+    public void EnsureRamSlots(int count)
+    {
+        if (ramSlots == null) ramSlots = new List<RamSlot>();
+        while (ramSlots.Count < count) ramSlots.Add(new RamSlot());
+    }
+
+    /// <summary>Dépose la box tenue en main dans la première case libre. Retourne l'index, ou -1.</summary>
+    public int DeposerAuto()
+    {
+        if (!boxExists) return -1;
+
+        int libre = -1;
+        for (int i = 0; i < ramSlots.Count; i++)
+            if (!ramSlots[i].filled) { libre = i; break; }
+        if (libre < 0) return -1; // RAM pleine : la box reste en main
+
+        var s = ramSlots[libre];
+        s.filled   = true;
+        s.variable = boxVariable;
+        s.value    = boxValue;
+        s.type     = boxType;
+        s.color    = boxColor;
+        s.material = boxMaterialAsset;
+
+        // La box quitte la main : plus rien à régénérer dans Main.
+        boxExists       = false;
+        boxVariable     = "";
+        boxValue        = "";
+        needsSpawn      = false;
+        spawnDansLaMain = false;
+
+        CompleterSiKind(QuestKind.Rangement); // valide la quête « stocker en RAM »
+        return libre;
+    }
+
+    /// <summary>Reprend la box de la case i en main (cube régénéré au prochain Main load).</summary>
+    public void PrendreSlot(int i)
+    {
+        if (i < 0 || i >= ramSlots.Count || !ramSlots[i].filled) return;
+
+        var s = ramSlots[i];
+        boxVariable      = s.variable;
+        boxValue         = s.value;
+        boxType          = s.type;
+        boxColor         = s.color;
+        boxMaterialAsset = s.material;
+        boxExists        = true;
+        needsSpawn       = true;
+        spawnDansLaMain  = true;
+
+        s.Vider();
     }
 
     // ── RAM (un seul emplacement) ─────────────────────────────────────────
