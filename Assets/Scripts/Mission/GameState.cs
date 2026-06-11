@@ -8,16 +8,19 @@ using UnityEngine.SceneManagement;
 public enum QuestKind
 {
     Tache,        // validée ailleurs (scénario...)
+    Visite,       // validée en se rendant au CPU (briefing)
     Declaration,  // validée en déclarant une variable au clavier
     Question,     // validée en répondant correctement au clavier
     Affichage,    // validée en déposant une variable sur l'écran de la console
-    Rangement     // validée en déposant une variable dans la RAM
+    Rangement,    // validée en déposant une variable dans la RAM
+    Saisie        // validée en entrant une valeur au clavier (Console.ReadLine)
 }
 
 /// <summary>
-/// Une quête / objectif affiché dans le CPU.
+/// Une mission / objectif affiché dans le CPU et le HUD.
 /// Pour une quête Question, 'description' contient la question posée et
 /// 'reponseAttendue' la réponse correcte (saisie au clavier).
+/// 'indication' = consigne courte façon Hitman, affichée dans le HUD.
 /// </summary>
 [System.Serializable]
 public class Quest
@@ -25,6 +28,8 @@ public class Quest
     public string    titre;
     [TextArea(1, 4)]
     public string    description;
+    [Tooltip("Consigne courte affichée dans le HUD (où aller, quoi faire).")]
+    public string    indication = "";
     public bool      complete;
     public QuestKind kind = QuestKind.Tache;
 
@@ -32,18 +37,20 @@ public class Quest
     public string reponseAttendue = "";
     public bool   reponseInsensibleCasse = true;
 
-    public Quest(string titre, string description, QuestKind kind = QuestKind.Tache)
+    public Quest(string titre, string description, QuestKind kind = QuestKind.Tache, string indication = "")
     {
         this.titre       = titre;
         this.description = description;
         this.kind        = kind;
+        this.indication  = indication;
         this.complete    = false;
     }
 
     /// <summary>Crée une quête-question (à répondre au clavier).</summary>
-    public static Quest CreerQuestion(string titre, string question, string reponse, bool insensibleCasse = true)
+    public static Quest CreerQuestion(string titre, string question, string reponse,
+                                      string indication = "", bool insensibleCasse = true)
     {
-        return new Quest(titre, question, QuestKind.Question)
+        return new Quest(titre, question, QuestKind.Question, indication)
         {
             reponseAttendue        = reponse,
             reponseInsensibleCasse = insensibleCasse
@@ -137,6 +144,9 @@ public class GameState : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         SceneManager.sceneLoaded += OnSceneLoaded;
         InitQuests();
+        MissionHUD.Ensure();
+        ObjectiveMarker.Ensure();
+        VoiceOver.Ensure();
     }
 
     void OnDestroy()
@@ -155,20 +165,48 @@ public class GameState : MonoBehaviour
         if (quests == null) quests = new List<Quest>();
         if (quests.Count > 0) return; // déjà peuplée (ex: depuis l'inspecteur)
 
+        // ── Campagne façon Hitman : missions guidées, dans l'ordre ──────────
         quests.Add(new Quest(
-            "1. Déclarer et afficher une variable",
-            "1) Approche le clavier et déclare une variable, ex : int nombre = 25\n" +
-            "2) Récupère la box générée dans ta main\n" +
-            "3) Approche l'écran de la console pour afficher sa valeur",
-            QuestKind.Affichage));
+            "Briefing au CPU",
+            "Le CPU centralise tes objectifs. Rends-toi au CPU pour recevoir ta première mission.",
+            QuestKind.Visite,
+            "Approche-toi du CPU pour recevoir tes objectifs."));
+
+        quests.Add(new Quest(
+            "Déclarer une variable",
+            "Toute donnée commence par une déclaration. Va au clavier et déclare une variable, ex : int nombre = 25",
+            QuestKind.Declaration,
+            "Va au clavier et déclare une variable (ex : int nombre = 25)."));
+
+        quests.Add(new Quest(
+            "Stocker en RAM",
+            "Une variable doit vivre en mémoire. Déclare une variable au clavier, puis porte la box dans la RAM.",
+            QuestKind.Rangement,
+            "Porte ta box jusqu'au portail de la RAM."));
+
+        quests.Add(new Quest(
+            "Afficher une valeur",
+            "Montre le résultat au monde. Déclare une variable (ou reprends-en une dans la RAM), puis porte la box jusqu'à l'écran de la console.",
+            QuestKind.Affichage,
+            "Porte une box jusqu'à l'écran de la console."));
+
+        quests.Add(new Quest(
+            "Console.ReadLine()",
+            "Le CPU attend une entrée utilisateur. Va au clavier et entre un nombre entier — le CPU s'en servira pour calculer.",
+            QuestKind.Saisie,
+            "Va au clavier et entre un nombre (Console.ReadLine)."));
+
         quests.Add(Quest.CreerQuestion(
-            "2. Répondre à une question du CPU",
-            "Combien font 2 + 3 * 4 ?  (réponds au clavier)",
-            "14"));
-        quests.Add(new Quest(
-            "3. Stocker une variable en RAM",
-            "Déclare une variable au clavier, puis dépose la box dans la RAM.",
-            QuestKind.Rangement));
+            "Calcul du CPU",
+            "{auto}",            // généré quand la saisie précédente est connue
+            "{auto}",
+            "Réponds au calcul du CPU au clavier."));
+
+        quests.Add(Quest.CreerQuestion(
+            "Priorité des opérations",
+            "Dernière mission : combien font 2 + 3 * 4 ?",
+            "14",
+            "Réponds à la question du CPU au clavier."));
     }
 
     /// <summary>Quête actuellement active (ou null si toutes terminées).</summary>
@@ -186,6 +224,35 @@ public class GameState : MonoBehaviour
         if (q == null) return;
         q.complete = true;
         if (questIndex < quests.Count - 1) questIndex++;
+        AudioFX.MissionValidee();
+        MissionHUD.Refresh();
+        ObjectiveMarker.Refresh();
+        VoiceOver.AnnoncerMission(); // la radio annonce la mission suivante
+    }
+
+    /// <summary>
+    /// Console.ReadLine : enregistre la valeur entrée au clavier, complète la
+    /// mission Saisie et génère le calcul de la mission Question suivante.
+    /// </summary>
+    public string derniereSaisie = "";
+
+    public void TerminerSaisie(string valeur)
+    {
+        derniereSaisie = valeur;
+        CompleterSiKind(QuestKind.Saisie);
+
+        // La mission suivante est un calcul basé sur la saisie ({auto}).
+        var q = QueteActuelle();
+        if (q != null && q.kind == QuestKind.Question && q.reponseAttendue == "{auto}"
+            && long.TryParse(valeur, out long n))
+        {
+            long a = Random.Range(2, 10);
+            long b = Random.Range(2, 6);
+            q.description     = $"Le CPU a reçu {n} via Console.ReadLine(). Calcule : {n} + {a} * {b} = ?";
+            q.reponseAttendue = (n + a * b).ToString();
+        }
+        MissionHUD.Refresh();
+        ObjectiveMarker.Refresh();
     }
 
     /// <summary>Complète la quête active seulement si elle est du type donné.</summary>
@@ -256,6 +323,7 @@ public class GameState : MonoBehaviour
         needsSpawn      = false;
         spawnDansLaMain = false;
 
+        AudioFX.Depot();
         CompleterSiKind(QuestKind.Rangement); // valide la quête « stocker en RAM »
         return libre;
     }

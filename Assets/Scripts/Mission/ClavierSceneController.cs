@@ -33,12 +33,14 @@ public class ClavierSceneController : MonoBehaviour
     private TextMeshProUGUI _ligneSaisie;
     private TextMeshProUGUI _feedback;
     private Quest           _question;   // quête-question active, sinon null
+    private Quest           _saisie;     // quête Console.ReadLine active, sinon null
     private bool            _verrouille; // bloque la saisie pendant la transition
 
     void Start()
     {
         var q = GameState.I.QueteActuelle();
         _question = (q != null && q.kind == QuestKind.Question && !q.complete) ? q : null;
+        _saisie   = (q != null && q.kind == QuestKind.Saisie   && !q.complete) ? q : null;
 
         ConstruireUI();
         ActualiserLigne();
@@ -98,6 +100,23 @@ public class ClavierSceneController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(_buffer)) return;
 
         string input = _buffer.Trim();
+
+        // MODE CONSOLE.READLINE : le CPU attend un nombre entier.
+        if (_saisie != null)
+        {
+            if (ExpressionEval.TryEval(input, out double sv) && EstEntier(sv))
+            {
+                string valeur = ((long)System.Math.Round(sv)).ToString(CultureInfo.InvariantCulture);
+                GameState.I.TerminerSaisie(valeur);
+                Succes($"Console.ReadLine() → {valeur}   (transmis au CPU)");
+                TerminerEtRevenir();
+            }
+            else
+            {
+                Erreur("Le CPU attend un nombre entier.");
+            }
+            return;
+        }
 
         // MODE QUESTION : on valide la réponse à la quête active.
         if (_question != null)
@@ -279,15 +298,18 @@ public class ClavierSceneController : MonoBehaviour
         fr.offsetMin = fr.offsetMax = Vector2.zero;
 
         // Titre
-        string titre = _question != null ? "QUESTION DU CPU" : "TERMINAL DE DÉCLARATION";
+        string titre = _saisie != null ? "CONSOLE.READLINE()"
+                     : _question != null ? "QUESTION DU CPU"
+                     : "TERMINAL DE DÉCLARATION";
         AjouterTexte(canvasGO.transform, titre,
             new Vector2(0.1f, 0.82f), new Vector2(0.9f, 0.92f), 42f, Color.white,
             TextAlignmentOptions.Center, FontStyles.Bold);
 
-        // Bandeau question (mode question uniquement)
-        if (_question != null)
+        // Bandeau consigne (mode question ou saisie)
+        var consigne = _saisie ?? _question;
+        if (consigne != null)
         {
-            AjouterTexte(canvasGO.transform, $"<color=#00D9FF>{_question.description}</color>",
+            AjouterTexte(canvasGO.transform, $"<color=#00D9FF>{consigne.description}</color>",
                 new Vector2(0.1f, 0.62f), new Vector2(0.9f, 0.78f), 34f, Color.white,
                 TextAlignmentOptions.Center, FontStyles.Normal);
         }
@@ -325,7 +347,9 @@ public class ClavierSceneController : MonoBehaviour
         fbr.offsetMin = fbr.offsetMax = Vector2.zero;
 
         // Aide
-        string aide = _question != null
+        string aide = _saisie != null
+            ? "Tape un nombre entier puis [Entrée]"
+            : _question != null
             ? "Tape ta réponse puis [Entrée]"
             : "Types : <color=#569CD6>int float string bool char</color>   •   ex : int x = 2 + 3 * 4;   •   Console.WriteLine(x);";
         AjouterTexte(canvasGO.transform, aide,
@@ -345,6 +369,7 @@ public class ClavierSceneController : MonoBehaviour
 
     void Erreur(string msg)
     {
+        AudioFX.Erreur();
         if (_feedback == null) return;
         _feedback.text    = $"<color=#FF6464>{msg}</color>";
         _feedback.enabled = true;
@@ -354,6 +379,7 @@ public class ClavierSceneController : MonoBehaviour
 
     void Succes(string msg)
     {
+        AudioFX.Succes();
         if (_feedback == null) return;
         _feedback.text    = $"<color=#73D973>{msg}</color>";
         _feedback.enabled = true;

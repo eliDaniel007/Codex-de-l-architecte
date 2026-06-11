@@ -69,6 +69,7 @@ public class ConsoleScreen : MonoBehaviour
         item.OnDropped();
         Destroy(item.gameObject);
         GameState.I.ConsommerPourEcran();
+        AudioFX.Depot();
         GameState.I.CompleterSiKind(QuestKind.Affichage); // valide la quête « afficher »
         PromptUI.Hide();
 

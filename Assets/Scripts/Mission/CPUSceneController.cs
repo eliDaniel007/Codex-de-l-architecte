@@ -24,6 +24,9 @@ public class CPUSceneController : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible   = true;
 
+        // Mission « Briefing » : se rendre au CPU valide la visite.
+        GameState.I.CompleterSiKind(QuestKind.Visite);
+
         ConstruireUI();
     }
 
@@ -74,7 +77,7 @@ public class CPUSceneController : MonoBehaviour
 
         // Titre
         AjouterTexte(canvasGO.transform, "<color=#00D9FF>CPU</color>  —  OBJECTIFS",
-            new Vector2(0.1f, 0.85f), new Vector2(0.9f, 0.95f), 54f, Color.white,
+            new Vector2(0.1f, 0.85f), new Vector2(0.9f, 0.95f), 70f, Color.white,
             TextAlignmentOptions.Center, FontStyles.Bold);
 
         // Sous-titre : quête active
@@ -86,7 +89,7 @@ public class CPUSceneController : MonoBehaviour
             ? $"Objectif actuel : <color=#00D9FF>{active.titre}</color>{indice}"
             : "<color=#73D973>Tous les objectifs sont terminés !</color>";
         AjouterTexte(canvasGO.transform, sousTitre,
-            new Vector2(0.1f, 0.75f), new Vector2(0.9f, 0.83f), 28f, new Color(0.85f, 0.9f, 1f),
+            new Vector2(0.04f, 0.75f), new Vector2(0.96f, 0.84f), 37f, new Color(0.85f, 0.9f, 1f),
             TextAlignmentOptions.Center, FontStyles.Normal);
 
         // Liste des quêtes
@@ -94,7 +97,7 @@ public class CPUSceneController : MonoBehaviour
 
         // Bouton retour + aide
         AjouterTexte(canvasGO.transform, "Appuie sur [Échap] ou [Entrée] pour revenir",
-            new Vector2(0.1f, 0.03f), new Vector2(0.9f, 0.09f), 22f, new Color(0.6f, 0.65f, 0.75f),
+            new Vector2(0.1f, 0.025f), new Vector2(0.9f, 0.09f), 25f, new Color(0.6f, 0.65f, 0.75f),
             TextAlignmentOptions.Center, FontStyles.Italic);
 
         CreerBouton(canvasGO.transform, "RETOUR", new Vector2(0.42f, 0.1f), new Vector2(0.58f, 0.17f),
@@ -107,12 +110,12 @@ public class CPUSceneController : MonoBehaviour
         var listGO = new GameObject("ListeQuetes");
         listGO.transform.SetParent(parent, false);
         var lr = listGO.AddComponent<RectTransform>();
-        lr.anchorMin = new Vector2(0.15f, 0.20f);
-        lr.anchorMax = new Vector2(0.85f, 0.72f);
+        lr.anchorMin = new Vector2(0.10f, 0.175f);
+        lr.anchorMax = new Vector2(0.90f, 0.74f);
         lr.offsetMin = lr.offsetMax = Vector2.zero;
 
         var vlg = listGO.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing            = 12f;
+        vlg.spacing            = 10f;
         vlg.childAlignment     = TextAnchor.UpperLeft;
         vlg.childControlHeight  = true;
         vlg.childControlWidth   = true;
@@ -130,7 +133,10 @@ public class CPUSceneController : MonoBehaviour
             else if (estActive)  { puce = "<color=#00D9FF>></color>";   couleur = colorActive; }
             else                 { puce = "<color=#8C99B3>-</color>";   couleur = colorPending; }
 
-            string ligne = $"{puce}  <b>{q.titre}</b>\n<size=78%><color=#AEB9CC>{q.description}</color></size>";
+            // Mission active : titre + détail. Les autres : une ligne compacte.
+            string ligne = estActive
+                ? $"{puce}  <b>{q.titre}</b>\n<size=70%><color=#AEB9CC>{q.description}</color></size>"
+                : $"{puce}  <b>{q.titre}</b>";
             AjouterLigneQuete(listGO.transform, ligne, couleur, estActive);
         }
     }
@@ -144,13 +150,13 @@ public class CPUSceneController : MonoBehaviour
         bg.color = surligne ? new Color(0f, 0.85f, 1f, 0.12f) : new Color(1f, 1f, 1f, 0.03f);
 
         var le = go.AddComponent<LayoutElement>();
-        le.minHeight = 110f;
+        le.minHeight = surligne ? 132f : 56f;
 
         var txtGO = new GameObject("Txt");
         txtGO.transform.SetParent(go.transform, false);
         var tmp = txtGO.AddComponent<TextMeshProUGUI>();
         tmp.text       = texte;
-        tmp.fontSize   = 22f;
+        tmp.fontSize   = 27f;
         tmp.color      = couleur;
         tmp.richText   = true;
         tmp.alignment  = TextAlignmentOptions.TopLeft;

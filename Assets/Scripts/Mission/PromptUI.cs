@@ -45,14 +45,14 @@ public class PromptUI : MonoBehaviour
         bgRect.anchorMax = new Vector2(0.5f, 0f);
         bgRect.pivot     = new Vector2(0.5f, 0f);
         bgRect.anchoredPosition = new Vector2(0f, 30f);
-        bgRect.sizeDelta = new Vector2(800f, 60f);
+        bgRect.sizeDelta = new Vector2(950f, 72f);
 
         // Label
         var labelGO = new GameObject("Label");
         labelGO.transform.SetParent(bg.transform, false);
         _label = labelGO.AddComponent<TextMeshProUGUI>();
         _label.alignment  = TextAlignmentOptions.Center;
-        _label.fontSize   = 22f;
+        _label.fontSize   = 27f;
         _label.color      = Color.white;
 
         var lr = labelGO.GetComponent<RectTransform>();

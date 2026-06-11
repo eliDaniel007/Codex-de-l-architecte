@@ -1710,8 +1710,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardTerminal
   clavierSceneName: Clavier
   playerTag: Player
-  forceTrigger: 1
-  promptText: '[E]  Entrer dans le clavier'
+  triggerRadius: 2.5
+  ignorerHauteur: 1
+  debug: 1
 --- !u!1 &1342691295 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -6689036041284674117, guid: 0ad8ef5c6b1f06f4babfd3a960e07865, type: 3}
@@ -1748,7 +1749,7 @@ Transform:
   m_GameObject: {fileID: 1367976153}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 4.3, z: -7.4}
+  m_LocalPosition: {x: 0, y: 1.96, z: -3.74}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1764,7 +1765,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7dd99d7a3e6944cfbf038c82c2dff6af, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CPUZone
   cpuSceneName: CPU
   playerTag: Player
@@ -2153,8 +2154,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardTerminal
   clavierSceneName: Clavier
   playerTag: Player
-  forceTrigger: 1
-  promptText: '[E]  Entrer dans le clavier'
+  triggerRadius: 2.5
+  ignorerHauteur: 1
+  debug: 1
 --- !u!4 &1885117771 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2774220344278030320, guid: 036873c23d3daac46a8a0a26249670d9, type: 3}
