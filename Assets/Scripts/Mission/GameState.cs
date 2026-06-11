@@ -16,7 +16,8 @@ public enum QuestKind
     Saisie,       // validée en entrant une valeur au clavier (Console.ReadLine)
     Condition,    // validée en affichant une valeur qui rend un test if vrai
     Compteur,     // validée en répétant un dépôt RAM N fois (boucle)
-    LectureRam    // validée en affichant une variable reprise depuis la RAM
+    LectureRam,   // validée en affichant une variable reprise depuis la RAM
+    Correction    // validée en corrigeant une ligne de code buggée au clavier
 }
 
 /// <summary>
@@ -47,6 +48,10 @@ public class Quest
     [Header("Si kind == Compteur")]
     public int objectifCompteur = 3;
     public int compteur         = 0;
+
+    [Header("Si kind == Correction")]
+    public string bugType = "";   // type attendu de la ligne corrigée
+    public string bugNom  = "";   // nom de variable attendu
 
     /// <summary>Teste la condition if (valeur op seuil).</summary>
     public bool TesterCondition(double v)
@@ -192,6 +197,7 @@ public class GameState : MonoBehaviour
         MissionHUD.Ensure();
         ObjectiveMarker.Ensure();
         VoiceOver.Ensure();
+        BriefingCinematic.Ensure();
     }
 
     void OnDestroy()
@@ -270,9 +276,24 @@ public class GameState : MonoBehaviour
 
         quests.Add(new Quest(
             "Lecture mémoire",
-            "Dernière mission : va dans la RAM, reprends une variable stockée (clique sa boîte), puis affiche-la sur l'écran de la console.",
+            "Va dans la RAM, reprends une variable stockée (clique sa boîte), puis affiche-la sur l'écran de la console.",
             QuestKind.LectureRam,
             "Reprends une variable dans la RAM et affiche-la sur l'écran."));
+
+        // Mission finale : corriger une ligne buggée (choisie au hasard).
+        string[][] bugs =
+        {
+            new[] { "int",   "nombre", "int nombre = \"abc\";",  "une valeur entière, ex : 25" },
+            new[] { "float", "prix",   "float prix = bonjour;",  "un nombre décimal, ex : 9.99" },
+            new[] { "bool",  "actif",  "bool actif = 42;",       "true ou false" },
+        };
+        var bug = bugs[Random.Range(0, bugs.Length)];
+        quests.Add(new Quest(
+            "Debug final",
+            $"Dernière mission : le CPU a détecté un bug :\n<color=#FF6464>{bug[2]}</color>\nRéécris la ligne corrigée au clavier ({bug[3]}).",
+            QuestKind.Correction,
+            "Va au clavier et corrige la ligne buggée.")
+        { bugType = bug[0], bugNom = bug[1] });
     }
 
     /// <summary>Quête actuellement active (ou null si toutes terminées).</summary>
@@ -444,6 +465,7 @@ public class GameState : MonoBehaviour
         needsSpawn = false; spawnDansLaMain = false; boxVientDeRam = false;
 
         VoiceOver.Reinitialiser();
+        BriefingCinematic.Reinitialiser(); // la cinématique rejouera
         MissionHUD.Refresh();
         ObjectiveMarker.Refresh();
         SceneManager.LoadScene(mainSceneName);

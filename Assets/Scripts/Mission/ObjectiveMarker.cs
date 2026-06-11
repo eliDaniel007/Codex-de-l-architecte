@@ -100,6 +100,7 @@ public class ObjectiveMarker : MonoBehaviour
                 case QuestKind.Declaration:
                 case QuestKind.Question:
                 case QuestKind.Saisie:
+                case QuestKind.Correction:
                     _cible = ClavierLePlusProche();
                     break;
 

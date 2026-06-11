@@ -34,13 +34,15 @@ public class ClavierSceneController : MonoBehaviour
     private TextMeshProUGUI _feedback;
     private Quest           _question;   // quête-question active, sinon null
     private Quest           _saisie;     // quête Console.ReadLine active, sinon null
+    private Quest           _correction; // quête Debug (ligne à corriger), sinon null
     private bool            _verrouille; // bloque la saisie pendant la transition
 
     void Start()
     {
         var q = GameState.I.QueteActuelle();
-        _question = (q != null && q.kind == QuestKind.Question && !q.complete) ? q : null;
-        _saisie   = (q != null && q.kind == QuestKind.Saisie   && !q.complete) ? q : null;
+        _question   = (q != null && q.kind == QuestKind.Question   && !q.complete) ? q : null;
+        _saisie     = (q != null && q.kind == QuestKind.Saisie     && !q.complete) ? q : null;
+        _correction = (q != null && q.kind == QuestKind.Correction && !q.complete) ? q : null;
 
         ConstruireUI();
         ActualiserLigne();
@@ -100,6 +102,28 @@ public class ClavierSceneController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(_buffer)) return;
 
         string input = _buffer.Trim();
+
+        // MODE DEBUG : corriger la ligne buggée (déclaration valide du bon type/nom).
+        if (_correction != null)
+        {
+            var mFix = Regex.Match(input, @"^(int|float|string|bool|char)\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;?$");
+            if (!mFix.Success)
+            {
+                Erreur("Écris la ligne corrigée : type nom = valeur;");
+                return;
+            }
+            string fType = mFix.Groups[1].Value, fNom = mFix.Groups[2].Value, fVal = mFix.Groups[3].Value.Trim();
+            if (fType != _correction.bugType || fNom != _correction.bugNom)
+            {
+                Erreur($"Le bug concerne « {_correction.bugType} {_correction.bugNom} » — corrige cette ligne-là.");
+                return;
+            }
+
+            ValiderDeclaration(fType, fNom, fVal); // valide la valeur, crée la box, revient
+            if (_verrouille) // la déclaration a réussi → le bug est corrigé
+                GameState.I.CompleterSiKind(QuestKind.Correction);
+            return;
+        }
 
         // MODE CONSOLE.READLINE : le CPU attend un nombre entier.
         if (_saisie != null)
@@ -298,15 +322,16 @@ public class ClavierSceneController : MonoBehaviour
         fr.offsetMin = fr.offsetMax = Vector2.zero;
 
         // Titre
-        string titre = _saisie != null ? "CONSOLE.READLINE()"
+        string titre = _correction != null ? "DEBUG — CORRIGE LE CODE"
+                     : _saisie != null ? "CONSOLE.READLINE()"
                      : _question != null ? "QUESTION DU CPU"
                      : "TERMINAL DE DÉCLARATION";
         AjouterTexte(canvasGO.transform, titre,
             new Vector2(0.1f, 0.82f), new Vector2(0.9f, 0.92f), 42f, Color.white,
             TextAlignmentOptions.Center, FontStyles.Bold);
 
-        // Bandeau consigne (mode question ou saisie)
-        var consigne = _saisie ?? _question;
+        // Bandeau consigne (mode question, saisie ou debug)
+        var consigne = _correction ?? _saisie ?? _question;
         if (consigne != null)
         {
             AjouterTexte(canvasGO.transform, $"<color=#00D9FF>{consigne.description}</color>",
@@ -347,7 +372,9 @@ public class ClavierSceneController : MonoBehaviour
         fbr.offsetMin = fbr.offsetMax = Vector2.zero;
 
         // Aide
-        string aide = _saisie != null
+        string aide = _correction != null
+            ? "Réécris la ligne corrigée puis [Entrée]"
+            : _saisie != null
             ? "Tape un nombre entier puis [Entrée]"
             : _question != null
             ? "Tape ta réponse puis [Entrée]"

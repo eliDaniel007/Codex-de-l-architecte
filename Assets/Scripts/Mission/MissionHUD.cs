@@ -2,6 +2,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// HUD de mission façon Hitman : bandeau en haut à gauche affichant la mission
@@ -46,6 +49,21 @@ public class MissionHUD : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void Update()
+    {
+        // Touche de test : F9 = réinitialiser toute la campagne
+        // (efface la sauvegarde, rejoue la cinématique et le briefing).
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && Keyboard.current.f9Key.wasPressedThisFrame)
+#else
+        if (Input.GetKeyDown(KeyCode.F9))
+#endif
+        {
+            Debug.Log("[MissionHUD] F9 → réinitialisation de la campagne.");
+            GameState.I.ReinitialiserCampagne();
+        }
     }
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
