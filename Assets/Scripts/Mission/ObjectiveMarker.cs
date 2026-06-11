@@ -103,14 +103,20 @@ public class ObjectiveMarker : MonoBehaviour
                     _cible = ClavierLePlusProche();
                     break;
 
+                // Box en main → destination ; sinon → d'abord le clavier.
                 case QuestKind.Rangement:
-                    var portail = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
-                    if (portail != null) _cible = portail.transform;
+                case QuestKind.Compteur:
+                    _cible = gs.boxExists ? PortailRam() : ClavierLePlusProche();
                     break;
 
                 case QuestKind.Affichage:
-                    var ecran = FindFirstObjectByType<ConsoleScreen>();
-                    if (ecran != null) _cible = ecran.transform;
+                case QuestKind.Condition:
+                    _cible = gs.boxExists ? Ecran() : ClavierLePlusProche();
+                    break;
+
+                // Box en main (reprise) → écran ; sinon → aller la chercher en RAM.
+                case QuestKind.LectureRam:
+                    _cible = gs.boxExists ? Ecran() : PortailRam();
                     break;
             }
         }
@@ -138,6 +144,18 @@ public class ObjectiveMarker : MonoBehaviour
         Bounds b = rends[0].bounds;
         for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
         return new Vector3(b.center.x, b.max.y + hauteur * 0.5f, b.center.z);
+    }
+
+    Transform PortailRam()
+    {
+        var p = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
+        return p != null ? p.transform : null;
+    }
+
+    Transform Ecran()
+    {
+        var e = FindFirstObjectByType<ConsoleScreen>();
+        return e != null ? e.transform : null;
     }
 
     Transform ClavierLePlusProche()

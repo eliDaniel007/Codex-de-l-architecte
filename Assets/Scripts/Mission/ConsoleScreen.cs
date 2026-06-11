@@ -65,22 +65,68 @@ public class ConsoleScreen : MonoBehaviour
 
     void Afficher(PickupItem item, DataBox db)
     {
+        var gs = GameState.I;
+        bool   vientDeRam = gs.boxVientDeRam; // à capturer AVANT consommation
+        string valeur     = db.value;
+
         if (_holder != null) _holder.ConsumeHeld();
         item.OnDropped();
         Destroy(item.gameObject);
-        GameState.I.ConsommerPourEcran();
+        gs.ConsommerPourEcran();
         AudioFX.Depot();
-        GameState.I.CompleterSiKind(QuestKind.Affichage); // valide la quête « afficher »
         PromptUI.Hide();
+
+        // Validation des missions liées à l'écran
+        var q = gs.QueteActuelle();
+        if (q != null && !q.complete)
+        {
+            switch (q.kind)
+            {
+                case QuestKind.Affichage:
+                    gs.CompleterQueteActuelle();
+                    break;
+
+                case QuestKind.Condition:
+                    if (double.TryParse(valeur.Replace(',', '.'),
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out double v)
+                        && q.TesterCondition(v))
+                    {
+                        gs.CompleterQueteActuelle();
+                    }
+                    else
+                    {
+                        AudioFX.Erreur();
+                        PromptUI.Show($"if (valeur {q.conditionOp} {q.conditionSeuil}) → <color=#FF6464>FAUX</color> avec {valeur}. Réessaie !");
+                        Invoke(nameof(CacherPrompt), 3.5f);
+                    }
+                    break;
+
+                case QuestKind.LectureRam:
+                    if (vientDeRam)
+                    {
+                        gs.CompleterQueteActuelle();
+                    }
+                    else
+                    {
+                        AudioFX.Erreur();
+                        PromptUI.Show("Cette variable ne vient pas de la RAM. Va d'abord la reprendre dans la RAM !");
+                        Invoke(nameof(CacherPrompt), 3.5f);
+                    }
+                    break;
+            }
+        }
 
         if (_screenText != null)
         {
             // Affiche UNIQUEMENT le nombre (ex: 25)
-            _screenText.text = db.value;
+            _screenText.text = valeur;
             _screenText.gameObject.SetActive(true);
             _screenText.transform.parent.gameObject.SetActive(true);
         }
     }
+
+    void CacherPrompt() => PromptUI.Hide();
 
     TextMeshPro Setup3DMonitorText(Transform anchor)
     {

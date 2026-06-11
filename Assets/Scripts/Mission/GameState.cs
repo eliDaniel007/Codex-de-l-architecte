@@ -13,7 +13,10 @@ public enum QuestKind
     Question,     // validée en répondant correctement au clavier
     Affichage,    // validée en déposant une variable sur l'écran de la console
     Rangement,    // validée en déposant une variable dans la RAM
-    Saisie        // validée en entrant une valeur au clavier (Console.ReadLine)
+    Saisie,       // validée en entrant une valeur au clavier (Console.ReadLine)
+    Condition,    // validée en affichant une valeur qui rend un test if vrai
+    Compteur,     // validée en répétant un dépôt RAM N fois (boucle)
+    LectureRam    // validée en affichant une variable reprise depuis la RAM
 }
 
 /// <summary>
@@ -36,6 +39,29 @@ public class Quest
     [Header("Si kind == Question")]
     public string reponseAttendue = "";
     public bool   reponseInsensibleCasse = true;
+
+    [Header("Si kind == Condition")]
+    public string conditionOp    = ">";
+    public double conditionSeuil = 10;
+
+    [Header("Si kind == Compteur")]
+    public int objectifCompteur = 3;
+    public int compteur         = 0;
+
+    /// <summary>Teste la condition if (valeur op seuil).</summary>
+    public bool TesterCondition(double v)
+    {
+        switch (conditionOp)
+        {
+            case ">":  return v >  conditionSeuil;
+            case "<":  return v <  conditionSeuil;
+            case ">=": return v >= conditionSeuil;
+            case "<=": return v <= conditionSeuil;
+            case "==": return System.Math.Abs(v - conditionSeuil) < 1e-9;
+            case "!=": return System.Math.Abs(v - conditionSeuil) > 1e-9;
+            default:   return false;
+        }
+    }
 
     public Quest(string titre, string description, QuestKind kind = QuestKind.Tache, string indication = "")
     {
@@ -117,6 +143,8 @@ public class GameState : MonoBehaviour
     [Header("RAM — cases multiples (boîtes sur les tablettes)")]
     [Tooltip("Contenu des cases. Dimensionné automatiquement par la scène RAM.")]
     public List<RamSlot> ramSlots = new List<RamSlot>();
+    [Tooltip("Vrai si la box en main a été reprise depuis la RAM (mission Lecture mémoire).")]
+    public bool boxVientDeRam;
 
     [Header("CPU — Quêtes")]
     [Tooltip("Liste des objectifs. La quête active est celle à l'index 'questIndex'.")]
@@ -204,9 +232,30 @@ public class GameState : MonoBehaviour
 
         quests.Add(Quest.CreerQuestion(
             "Priorité des opérations",
-            "Dernière mission : combien font 2 + 3 * 4 ?",
+            "Combien font 2 + 3 * 4 ?",
             "14",
             "Réponds à la question du CPU au clavier."));
+
+        int seuil = Random.Range(5, 21);
+        quests.Add(new Quest(
+            "Condition if",
+            $"Le CPU teste : if (valeur > {seuil}). Déclare une variable dont la valeur rend la condition VRAIE, puis affiche-la sur l'écran.",
+            QuestKind.Condition,
+            $"Affiche sur l'écran une valeur qui rend if (valeur > {seuil}) vraie.")
+        { conditionOp = ">", conditionSeuil = seuil });
+
+        quests.Add(new Quest(
+            "Boucle de stockage",
+            "while (n < 3) : déclare et stocke 3 variables dans la RAM, l'une après l'autre.",
+            QuestKind.Compteur,
+            "Stocke 3 variables dans la RAM, une par une.")
+        { objectifCompteur = 3 });
+
+        quests.Add(new Quest(
+            "Lecture mémoire",
+            "Dernière mission : va dans la RAM, reprends une variable stockée (clique sa boîte), puis affiche-la sur l'écran de la console.",
+            QuestKind.LectureRam,
+            "Reprends une variable dans la RAM et affiche-la sur l'écran."));
     }
 
     /// <summary>Quête actuellement active (ou null si toutes terminées).</summary>
@@ -279,8 +328,9 @@ public class GameState : MonoBehaviour
         boxType     = type;
         if (color.HasValue) boxColor = color.Value;
         boxMaterialAsset = mat;
-        boxExists   = true;
-        needsSpawn  = true;
+        boxExists      = true;
+        needsSpawn     = true;
+        boxVientDeRam  = false; // box fraîchement déclarée, pas reprise de la RAM
     }
 
     public void RetourSansDepot()
@@ -324,7 +374,22 @@ public class GameState : MonoBehaviour
         spawnDansLaMain = false;
 
         AudioFX.Depot();
-        CompleterSiKind(QuestKind.Rangement); // valide la quête « stocker en RAM »
+
+        // Missions liées au dépôt RAM
+        var q = QueteActuelle();
+        if (q != null && !q.complete)
+        {
+            if (q.kind == QuestKind.Rangement)
+            {
+                CompleterQueteActuelle();
+            }
+            else if (q.kind == QuestKind.Compteur)
+            {
+                q.compteur++;
+                if (q.compteur >= q.objectifCompteur) CompleterQueteActuelle();
+                else { MissionHUD.Refresh(); ObjectiveMarker.Refresh(); }
+            }
+        }
         return libre;
     }
 
@@ -342,6 +407,7 @@ public class GameState : MonoBehaviour
         boxExists        = true;
         needsSpawn       = true;
         spawnDansLaMain  = true;
+        boxVientDeRam    = true; // reprise depuis la RAM (mission Lecture mémoire)
 
         s.Vider();
     }

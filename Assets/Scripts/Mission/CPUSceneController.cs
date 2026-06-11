@@ -122,23 +122,49 @@ public class CPUSceneController : MonoBehaviour
         vlg.childForceExpandHeight = false;
         vlg.childForceExpandWidth  = true;
 
+        // Fenêtre d'affichage : accomplies repliées en 1 ligne, mission active
+        // dépliée, puis les prochaines (max 4) et un compteur pour le reste.
+        int faites = 0;
+        foreach (var qq in gs.quests) if (qq.complete) faites++;
+
+        if (faites > 0)
+            AjouterLigneQuete(listGO.transform,
+                $"<color=#73D973>[x]</color>  <b>{faites} mission{(faites > 1 ? "s" : "")} accomplie{(faites > 1 ? "s" : "")}</b>",
+                colorDone, false);
+
+        int suivantesAffichees = 0, suivantesTotal = 0;
         for (int i = 0; i < gs.quests.Count; i++)
         {
             var q = gs.quests[i];
-            bool estActive = (i == gs.questIndex) && !q.complete;
+            if (q.complete) continue;
+            bool estActive = (i == gs.questIndex);
 
-            string puce;
-            Color  couleur;
-            if (q.complete)      { puce = "<color=#73D973>[x]</color>"; couleur = colorDone; }
-            else if (estActive)  { puce = "<color=#00D9FF>></color>";   couleur = colorActive; }
-            else                 { puce = "<color=#8C99B3>-</color>";   couleur = colorPending; }
-
-            // Mission active : titre + détail. Les autres : une ligne compacte.
-            string ligne = estActive
-                ? $"{puce}  <b>{q.titre}</b>\n<size=70%><color=#AEB9CC>{q.description}</color></size>"
-                : $"{puce}  <b>{q.titre}</b>";
-            AjouterLigneQuete(listGO.transform, ligne, couleur, estActive);
+            if (estActive)
+            {
+                string progression = (q.kind == QuestKind.Compteur)
+                    ? $"  <color=#FFD27F>({q.compteur}/{q.objectifCompteur})</color>"
+                    : "";
+                string ligne = $"<color=#00D9FF>></color>  <b>{q.titre}</b>{progression}\n" +
+                               $"<size=70%><color=#AEB9CC>{q.description}</color></size>";
+                AjouterLigneQuete(listGO.transform, ligne, colorActive, true);
+            }
+            else
+            {
+                suivantesTotal++;
+                if (suivantesAffichees < 4)
+                {
+                    suivantesAffichees++;
+                    AjouterLigneQuete(listGO.transform,
+                        $"<color=#8C99B3>-</color>  <b>{q.titre}</b>", colorPending, false);
+                }
+            }
         }
+
+        int restantes = suivantesTotal - suivantesAffichees;
+        if (restantes > 0)
+            AjouterLigneQuete(listGO.transform,
+                $"<color=#5A6473>…  + {restantes} autre{(restantes > 1 ? "s" : "")} mission{(restantes > 1 ? "s" : "")}</color>",
+                colorPending, false);
     }
 
     void AjouterLigneQuete(Transform parent, string texte, Color couleur, bool surligne)

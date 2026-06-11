@@ -72,8 +72,12 @@ public class MissionHUD : MonoBehaviour
             return;
         }
 
+        string progression = (q.kind == QuestKind.Compteur)
+            ? $"  <color=#FFD27F>({q.compteur}/{q.objectifCompteur})</color>"
+            : "";
+
         _numero.text     = $"MISSION {gs.questIndex + 1}/{gs.quests.Count}";
-        _titre.text      = q.titre;
+        _titre.text      = q.titre + progression;
         _indication.text = string.IsNullOrEmpty(q.indication) ? q.description : q.indication;
     }
 
