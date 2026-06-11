@@ -97,6 +97,7 @@ public class ConsoleScreen : MonoBehaviour
                     else
                     {
                         AudioFX.Erreur();
+                        gs.SignalerErreur();
                         PromptUI.Show($"if (valeur {q.conditionOp} {q.conditionSeuil}) → <color=#FF6464>FAUX</color> avec {valeur}. Réessaie !");
                         Invoke(nameof(CacherPrompt), 3.5f);
                     }
@@ -110,6 +111,7 @@ public class ConsoleScreen : MonoBehaviour
                     else
                     {
                         AudioFX.Erreur();
+                        gs.SignalerErreur();
                         PromptUI.Show("Cette variable ne vient pas de la RAM. Va d'abord la reprendre dans la RAM !");
                         Invoke(nameof(CacherPrompt), 3.5f);
                     }

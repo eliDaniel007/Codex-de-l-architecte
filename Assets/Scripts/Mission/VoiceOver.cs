@@ -29,6 +29,14 @@ public class VoiceOver : MonoBehaviour
         if (Instance != null) Instance.Annoncer(delai);
     }
 
+    /// <summary>Réinitialise la radio (nouvelle campagne) et rejoue le briefing.</summary>
+    public static void Reinitialiser()
+    {
+        if (Instance == null) return;
+        Instance._derniereAnnonce = int.MinValue;
+        Instance.Annoncer(1.5f);
+    }
+
     void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }

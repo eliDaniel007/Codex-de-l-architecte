@@ -157,6 +157,21 @@ public class GameState : MonoBehaviour
     public bool clavierJustVisited;
     private bool _questsInit;
 
+    [Header("Score (rating de fin)")]
+    [Tooltip("Erreurs commises (mauvaises réponses, conditions ratées...).")]
+    public int nbErreurs;
+    private float _sessionDebut;    // realtimeSinceStartup au lancement de la session
+    private float _tempsAnterieur;  // temps cumulé des sessions précédentes (sauvegarde)
+
+    /// <summary>Temps total de la campagne en secondes (sessions cumulées).</summary>
+    public float TempsCampagne => _tempsAnterieur + (Time.realtimeSinceStartup - _sessionDebut);
+
+    public void SignalerErreur()
+    {
+        nbErreurs++;
+        Sauvegarder();
+    }
+
     [Header("Flux scènes")]
 [Tooltip("Au prochain chargement de MainScene, fait apparaître un cube physique.")]
     public bool   needsSpawn;
@@ -171,7 +186,9 @@ public class GameState : MonoBehaviour
         _i = this;
         DontDestroyOnLoad(gameObject);
         SceneManager.sceneLoaded += OnSceneLoaded;
+        _sessionDebut = Time.realtimeSinceStartup;
         InitQuests();
+        Charger(); // restaure la progression sauvegardée (le cas échéant)
         MissionHUD.Ensure();
         ObjectiveMarker.Ensure();
         VoiceOver.Ensure();
@@ -277,6 +294,10 @@ public class GameState : MonoBehaviour
         MissionHUD.Refresh();
         ObjectiveMarker.Refresh();
         VoiceOver.AnnoncerMission(); // la radio annonce la mission suivante
+        Sauvegarder();
+
+        if (ToutesQuetesTerminees())
+            RatingScreen.Afficher(); // écran de rating façon Hitman
     }
 
     /// <summary>
@@ -289,19 +310,24 @@ public class GameState : MonoBehaviour
     {
         derniereSaisie = valeur;
         CompleterSiKind(QuestKind.Saisie);
+        GenererCalculAuto();
+        MissionHUD.Refresh();
+        ObjectiveMarker.Refresh();
+        Sauvegarder();
+    }
 
-        // La mission suivante est un calcul basé sur la saisie ({auto}).
+    /// <summary>Génère la question-calcul ({auto}) à partir de la dernière saisie.</summary>
+    void GenererCalculAuto()
+    {
         var q = QueteActuelle();
         if (q != null && q.kind == QuestKind.Question && q.reponseAttendue == "{auto}"
-            && long.TryParse(valeur, out long n))
+            && long.TryParse(derniereSaisie, out long n))
         {
             long a = Random.Range(2, 10);
             long b = Random.Range(2, 6);
             q.description     = $"Le CPU a reçu {n} via Console.ReadLine(). Calcule : {n} + {a} * {b} = ?";
             q.reponseAttendue = (n + a * b).ToString();
         }
-        MissionHUD.Refresh();
-        ObjectiveMarker.Refresh();
     }
 
     /// <summary>Complète la quête active seulement si elle est du type donné.</summary>
@@ -317,6 +343,110 @@ public class GameState : MonoBehaviour
     {
         InitQuests();
         return questIndex >= quests.Count - 1 && quests.Count > 0 && quests[quests.Count - 1].complete;
+    }
+
+    // ── sauvegarde de progression (PlayerPrefs) ───────────────────────────
+
+    /// <summary>Sauvegarde missions, compteurs, erreurs, temps et contenu RAM.</summary>
+    public void Sauvegarder()
+    {
+        PlayerPrefs.SetInt("cda_actif", 1);
+        PlayerPrefs.SetInt("cda_questIndex", questIndex);
+        PlayerPrefs.SetInt("cda_erreurs", nbErreurs);
+        PlayerPrefs.SetFloat("cda_temps", TempsCampagne);
+        PlayerPrefs.SetString("cda_saisie", derniereSaisie);
+
+        var completes = new System.Text.StringBuilder();
+        foreach (var q in quests)
+        {
+            completes.Append(q.complete ? '1' : '0');
+            if (q.kind == QuestKind.Compteur) PlayerPrefs.SetInt("cda_compteur", q.compteur);
+        }
+        PlayerPrefs.SetString("cda_completes", completes.ToString());
+
+        var ram = new System.Text.StringBuilder();
+        foreach (var s in ramSlots)
+        {
+            if (ram.Length > 0) ram.Append('\n');
+            ram.Append(s.filled ? '1' : '0').Append('|')
+               .Append(s.variable).Append('|')
+               .Append(s.value).Append('|')
+               .Append(s.type).Append('|')
+               .Append(ColorUtility.ToHtmlStringRGBA(s.color));
+        }
+        PlayerPrefs.SetString("cda_ram", ram.ToString());
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>Restaure la progression sauvegardée (si elle existe).</summary>
+    void Charger()
+    {
+        if (PlayerPrefs.GetInt("cda_actif", 0) != 1) return;
+
+        questIndex      = Mathf.Clamp(PlayerPrefs.GetInt("cda_questIndex", 0), 0, quests.Count - 1);
+        nbErreurs       = PlayerPrefs.GetInt("cda_erreurs", 0);
+        _tempsAnterieur = PlayerPrefs.GetFloat("cda_temps", 0f);
+        derniereSaisie  = PlayerPrefs.GetString("cda_saisie", "");
+
+        string completes = PlayerPrefs.GetString("cda_completes", "");
+        for (int i = 0; i < quests.Count && i < completes.Length; i++)
+        {
+            quests[i].complete = completes[i] == '1';
+            if (quests[i].kind == QuestKind.Compteur && !quests[i].complete)
+                quests[i].compteur = PlayerPrefs.GetInt("cda_compteur", 0);
+        }
+
+        GenererCalculAuto(); // si la mission active est le calcul {auto}
+
+        string ram = PlayerPrefs.GetString("cda_ram", "");
+        if (!string.IsNullOrEmpty(ram))
+        {
+            var lignes = ram.Split('\n');
+            EnsureRamSlots(lignes.Length);
+            for (int i = 0; i < lignes.Length; i++)
+            {
+                var p = lignes[i].Split('|');
+                if (p.Length < 5) continue;
+                var s = ramSlots[i];
+                s.filled   = p[0] == "1";
+                s.variable = p[1];
+                s.value    = p[2];
+                s.type     = p[3];
+                if (ColorUtility.TryParseHtmlString("#" + p[4], out var c)) s.color = c;
+            }
+        }
+
+        Debug.Log($"[GameState] Progression chargée : mission {questIndex + 1}/{quests.Count}, {nbErreurs} erreur(s).");
+
+        // Campagne déjà terminée → on remontre le rating (et l'option Recommencer).
+        if (ToutesQuetesTerminees()) RatingScreen.Afficher();
+    }
+
+    /// <summary>Efface la sauvegarde et relance la campagne du début.</summary>
+    public void ReinitialiserCampagne()
+    {
+        foreach (var k in new[] { "cda_actif", "cda_questIndex", "cda_erreurs", "cda_temps",
+                                  "cda_saisie", "cda_completes", "cda_compteur", "cda_ram" })
+            PlayerPrefs.DeleteKey(k);
+        PlayerPrefs.Save();
+
+        quests.Clear();
+        _questsInit = false;
+        InitQuests();
+        questIndex = 0;
+        nbErreurs  = 0;
+        _tempsAnterieur = 0f;
+        _sessionDebut   = Time.realtimeSinceStartup;
+        derniereSaisie  = "";
+
+        foreach (var s in ramSlots) s.Vider();
+        boxExists = false; boxVariable = ""; boxValue = "";
+        needsSpawn = false; spawnDansLaMain = false; boxVientDeRam = false;
+
+        VoiceOver.Reinitialiser();
+        MissionHUD.Refresh();
+        ObjectiveMarker.Refresh();
+        SceneManager.LoadScene(mainSceneName);
     }
 
     // ── transitions ───────────────────────────────────────────────────────
@@ -390,6 +520,7 @@ public class GameState : MonoBehaviour
                 else { MissionHUD.Refresh(); ObjectiveMarker.Refresh(); }
             }
         }
+        Sauvegarder();
         return libre;
     }
 
@@ -410,6 +541,7 @@ public class GameState : MonoBehaviour
         boxVientDeRam    = true; // reprise depuis la RAM (mission Lecture mémoire)
 
         s.Vider();
+        Sauvegarder();
     }
 
     // ── RAM (un seul emplacement) ─────────────────────────────────────────

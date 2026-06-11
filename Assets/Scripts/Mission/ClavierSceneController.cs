@@ -370,6 +370,7 @@ public class ClavierSceneController : MonoBehaviour
     void Erreur(string msg)
     {
         AudioFX.Erreur();
+        GameState.I.SignalerErreur(); // compte pour le rating de fin
         if (_feedback == null) return;
         _feedback.text    = $"<color=#FF6464>{msg}</color>";
         _feedback.enabled = true;
