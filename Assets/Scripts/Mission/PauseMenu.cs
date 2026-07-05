@@ -64,8 +64,8 @@ public class PauseMenu : MonoBehaviour
     {
         // La pause n'existe que dans la MainScene (les autres scènes ont [Échap] = Retour).
         if (SceneManager.GetActiveScene().name != GameState.I.mainSceneName) return;
-        // Pas pendant la cinématique ni l'écran de rating (eux gèrent leurs touches).
-        if (!_enPause && (BriefingCinematic.EnCours || RatingScreen.Visible)) return;
+        // Pas pendant la cinématique, le rating ou le journal (eux gèrent leurs touches).
+        if (!_enPause && (BriefingCinematic.EnCours || RatingScreen.Visible || JournalMissions.EstOuvert)) return;
 
 #if ENABLE_INPUT_SYSTEM
         bool echap = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;

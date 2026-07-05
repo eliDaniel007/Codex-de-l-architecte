@@ -139,7 +139,7 @@ public class CPUSceneController : MonoBehaviour
             {
                 // Ligne de code encore verrouillée.
                 AjouterLigneQuete(listGO.transform,
-                    "<color=#5A6473>🔒  ligne verrouillée</color>", colorPending, false);
+                    "<color=#5A6473>[verrouillée]</color>", colorPending, false);
                 continue;
             }
 

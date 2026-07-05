@@ -12,6 +12,9 @@ public class ObjectiveMarker : MonoBehaviour
 {
     public static ObjectiveMarker Instance { get; private set; }
 
+    /// <summary>Cible actuelle de l'objectif (pour la minimap). Null si aucune.</summary>
+    public static Transform CibleActuelle => Instance != null ? Instance._cible : null;
+
     [Header("Réglages")]
     public float hauteur         = 2.2f;   // hauteur au-dessus de la cible
     public float amplitude       = 0.25f;  // flottement vertical

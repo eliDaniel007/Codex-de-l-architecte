@@ -189,6 +189,7 @@ public class GameState : MonoBehaviour
     public void SignalerErreur()
     {
         nbErreurs++;
+        HumourOS.Erreur(); // l'OS commente (avec ironie bienveillante)
         Sauvegarder();
     }
 
@@ -214,6 +215,12 @@ public class GameState : MonoBehaviour
         VoiceOver.Ensure();
         BriefingCinematic.Ensure();
         PauseMenu.Ensure();
+        NotificationsUI.Ensure(); // toasts (badges, rating de mission)
+        ScreenShake.Ensure();     // secousse caméra à la validation
+        JournalMissions.Ensure(); // journal de mission (touche J)
+        HumourOS.Ensure();        // répliques ironiques de l'OS
+        MiniCarte.Ensure();       // minimap circuit imprimé (bas-droit)
+        DemarrerChronoMission();  // base de temps de la 1re mission
     }
 
     void OnDestroy()
@@ -394,6 +401,14 @@ public class GameState : MonoBehaviour
         s.color  = CouleurType(type);
 
         AudioFX.Depot();
+
+        // Badges liés à la déclaration
+        Badges.PremiereBoite();
+        if (type == "float") Badges.PremierFloat();
+        int occupees = 0;
+        foreach (var slot in ramSlots) if (slot.filled) occupees++;
+        Badges.MemoireBienRemplie(occupees);
+
         if (m1)
         {
             CompleterQueteActuelle();
@@ -502,18 +517,53 @@ public class GameState : MonoBehaviour
         var q = QueteActuelle();
         if (q == null) return;
         q.complete = true;
+
+        // ── Rating de la ligne : durée + erreurs depuis sa révélation ──
+        float dureeMission   = TempsCampagne - _missionChronoDebut;
+        int   erreursMission = nbErreurs - _missionErreursDebut;
+        AnnoncerRatingMission(q, dureeMission, erreursMission);
+        Badges.MissionTerminee(dureeMission, erreursMission);
+
         if (questIndex < quests.Count - 1) questIndex++;
         missionEtape = 0; // chaque mission repart à son étape 0
         AudioFX.MissionValidee();
+        ScreenShake.Jouer(); // petite secousse de validation
         MajIndication();
         Sauvegarder();
 
         if (ToutesQuetesTerminees())
         {
+            Badges.CampagneTerminee(nbErreurs);
             VoiceOver.AnnoncerMission(); // joue la réplique de fin
             RatingScreen.Afficher();     // écran de rating façon Hitman
         }
         // sinon : la mission suivante sera annoncée quand le joueur ira au CPU.
+    }
+
+    // ── rating par mission (façon Hitman, en toast) ───────────────────────
+
+    [System.NonSerialized] private float _missionChronoDebut;
+    [System.NonSerialized] private int   _missionErreursDebut;
+
+    /// <summary>Démarre le chrono de la mission (à sa révélation au CPU).</summary>
+    void DemarrerChronoMission()
+    {
+        _missionChronoDebut  = TempsCampagne;
+        _missionErreursDebut = nbErreurs;
+    }
+
+    void AnnoncerRatingMission(Quest q, float duree, int erreurs)
+    {
+        int etoiles = (erreurs == 0 && duree < 90f) ? 3
+                    : (erreurs <= 1)                ? 2
+                    :                                 1;
+        string titreNote = etoiles == 3 ? "Architecte Élégant"
+                         : etoiles == 2 ? "Exécution Solide"
+                         :                "En Rodage";
+        NotificationsUI.Afficher(
+            $"LIGNE TERMINÉE   <color=#FFD24F>{etoiles}/3</color>",
+            $"{titreNote} — {duree:0} s, {erreurs} erreur{(erreurs > 1 ? "s" : "")}",
+            new Color(0f, 1f, 0.55f));
     }
 
     /// <summary>
@@ -575,6 +625,7 @@ public class GameState : MonoBehaviour
         if (questIndex > missionRevelee)
         {
             missionRevelee = questIndex;
+            DemarrerChronoMission();     // le chrono de la ligne démarre au briefing
             AudioFX.Succes();
             VoiceOver.AnnoncerMission(); // la radio détaille la mission révélée
             MissionHUD.Refresh();
@@ -778,6 +829,11 @@ public class GameState : MonoBehaviour
 
         ConsommerBoxEnMain(); // la box quitte la main
         AudioFX.Depot();
+
+        // Badges liés au contenu de la RAM
+        int occupees = 0;
+        foreach (var slot in ramSlots) if (slot.filled) occupees++;
+        Badges.MemoireBienRemplie(occupees);
 
         // Missions validées par un dépôt en RAM
         var q = QueteActuelle();
