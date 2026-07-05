@@ -19,13 +19,18 @@ public class CPUSceneController : MonoBehaviour
     public Color colorDone      = new Color(0.45f, 0.85f, 0.45f); // Vert : terminée
     public Color colorPending   = new Color(0.55f, 0.6f, 0.7f);   // Gris : à venir
 
+    private string _calcMessage; // message du calcul (x reçu, résultat...)
+
     void Start()
     {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible   = true;
 
-        // Mission « Briefing » : se rendre au CPU valide la visite.
-        GameState.I.CompleterSiKind(QuestKind.Visite);
+        // Briefing : la visite au CPU révèle la mission active.
+        GameState.I.RevelerMissionActuelle();
+
+        // Si le joueur porte une box inattendue, le CPU peut lui donner un indice.
+        _calcMessage = GameState.I.CpuRecevoir();
 
         ConstruireUI();
     }
@@ -76,21 +81,24 @@ public class CPUSceneController : MonoBehaviour
         fr.offsetMin = fr.offsetMax = Vector2.zero;
 
         // Titre
-        AjouterTexte(canvasGO.transform, "<color=#00D9FF>CPU</color>  —  OBJECTIFS",
-            new Vector2(0.1f, 0.85f), new Vector2(0.9f, 0.95f), 70f, Color.white,
+        AjouterTexte(canvasGO.transform, "<color=#00D9FF>CPU</color>  —  LE PROGRAMME À EXÉCUTER",
+            new Vector2(0.1f, 0.85f), new Vector2(0.9f, 0.95f), 62f, Color.white,
             TextAlignmentOptions.Center, FontStyles.Bold);
 
-        // Sous-titre : quête active
+        // Sous-titre : ligne de code active
         var active = gs.QueteActuelle();
-        string indice = (active != null && active.kind == QuestKind.Question)
-            ? "  <size=70%><color=#FFD27F>(réponds au clavier)</color></size>"
-            : "";
         string sousTitre = active != null
-            ? $"Objectif actuel : <color=#00D9FF>{active.titre}</color>{indice}"
-            : "<color=#73D973>Tous les objectifs sont terminés !</color>";
+            ? $"Ligne en cours : <color=#00D9FF>{active.titre}</color>"
+            : "<color=#73D973>Programme exécuté avec succès !</color>";
         AjouterTexte(canvasGO.transform, sousTitre,
             new Vector2(0.04f, 0.75f), new Vector2(0.96f, 0.84f), 37f, new Color(0.85f, 0.9f, 1f),
             TextAlignmentOptions.Center, FontStyles.Normal);
+
+        // Message du calcul (x reçu / résultat...)
+        if (!string.IsNullOrEmpty(_calcMessage))
+            AjouterTexte(canvasGO.transform, $"<color=#00D9FF>{_calcMessage}</color>",
+                new Vector2(0.04f, 0.67f), new Vector2(0.96f, 0.745f), 32f, Color.white,
+                TextAlignmentOptions.Center, FontStyles.Bold);
 
         // Liste des quêtes
         ConstruireListe(canvasGO.transform, gs);
@@ -122,49 +130,39 @@ public class CPUSceneController : MonoBehaviour
         vlg.childForceExpandHeight = false;
         vlg.childForceExpandWidth  = true;
 
-        // Fenêtre d'affichage : accomplies repliées en 1 ligne, mission active
-        // dépliée, puis les prochaines (max 4) et un compteur pour le reste.
-        int faites = 0;
-        foreach (var qq in gs.quests) if (qq.complete) faites++;
-
-        if (faites > 0)
-            AjouterLigneQuete(listGO.transform,
-                $"<color=#73D973>[x]</color>  <b>{faites} mission{(faites > 1 ? "s" : "")} accomplie{(faites > 1 ? "s" : "")}</b>",
-                colorDone, false);
-
-        int suivantesAffichees = 0, suivantesTotal = 0;
+        // Seules les missions RÉVÉLÉES sont visibles ; les suivantes sont verrouillées.
         for (int i = 0; i < gs.quests.Count; i++)
         {
             var q = gs.quests[i];
-            if (q.complete) continue;
-            bool estActive = (i == gs.questIndex);
 
-            if (estActive)
+            if (i > gs.missionRevelee)
+            {
+                // Ligne de code encore verrouillée.
+                AjouterLigneQuete(listGO.transform,
+                    "<color=#5A6473>🔒  ligne verrouillée</color>", colorPending, false);
+                continue;
+            }
+
+            if (q.complete)
+            {
+                AjouterLigneQuete(listGO.transform,
+                    $"<color=#73D973>[x]</color>  <b>{q.titre}</b>", colorDone, false);
+            }
+            else if (i == gs.questIndex)
             {
                 string progression = (q.kind == QuestKind.Compteur)
                     ? $"  <color=#FFD27F>({q.compteur}/{q.objectifCompteur})</color>"
                     : "";
-                string ligne = $"<color=#00D9FF>></color>  <b>{q.titre}</b>{progression}\n" +
-                               $"<size=70%><color=#AEB9CC>{q.description}</color></size>";
+                string ligne = $"<color=#00D9FF>></color>  <b>{q.titre}</b>{progression}   " +
+                               $"<size=80%><color=#6BBF59><i>{q.description}</i></color></size>";
                 AjouterLigneQuete(listGO.transform, ligne, colorActive, true);
             }
             else
             {
-                suivantesTotal++;
-                if (suivantesAffichees < 4)
-                {
-                    suivantesAffichees++;
-                    AjouterLigneQuete(listGO.transform,
-                        $"<color=#8C99B3>-</color>  <b>{q.titre}</b>", colorPending, false);
-                }
+                AjouterLigneQuete(listGO.transform,
+                    $"<color=#8C99B3>-</color>  <b>{q.titre}</b>", colorPending, false);
             }
         }
-
-        int restantes = suivantesTotal - suivantesAffichees;
-        if (restantes > 0)
-            AjouterLigneQuete(listGO.transform,
-                $"<color=#5A6473>…  + {restantes} autre{(restantes > 1 ? "s" : "")} mission{(restantes > 1 ? "s" : "")}</color>",
-                colorPending, false);
     }
 
     void AjouterLigneQuete(Transform parent, string texte, Color couleur, bool surligne)

@@ -29,12 +29,12 @@ public class VoiceOver : MonoBehaviour
         if (Instance != null) Instance.Annoncer(delai);
     }
 
-    /// <summary>Réinitialise la radio (nouvelle campagne) et rejoue le briefing.</summary>
+    /// <summary>Réinitialise la radio (nouvelle campagne) et rejoue l'intro.</summary>
     public static void Reinitialiser()
     {
         if (Instance == null) return;
         Instance._derniereAnnonce = int.MinValue;
-        Instance.Annoncer(1.5f);
+        Instance.JouerNomme("intro", 1.5f);
     }
 
     void Awake()
@@ -50,7 +50,10 @@ public class VoiceOver : MonoBehaviour
 
     void Start()
     {
-        Annoncer(1.2f); // briefing de départ
+        if (GameState.I.BriefingEnAttente())
+            JouerNomme("intro", 1.2f);     // « rends-toi au CPU pour tes objectifs »
+        else
+            Annoncer(1.2f);                // reprend l'annonce de la mission en cours
     }
 
     void Annoncer(float delai)
@@ -65,13 +68,17 @@ public class VoiceOver : MonoBehaviour
         if (idx == _derniereAnnonce) return; // déjà annoncée
         _derniereAnnonce = idx;
 
+        JouerNomme(clipName, delai);
+    }
+
+    void JouerNomme(string clipName, float delai)
+    {
         var clip = Resources.Load<AudioClip>("Voix/" + clipName);
         if (clip == null)
         {
             Debug.LogWarning($"[VoiceOver] Clip 'Voix/{clipName}' introuvable.");
             return;
         }
-
         StopAllCoroutines();
         StartCoroutine(JouerRadio(clip, delai));
     }

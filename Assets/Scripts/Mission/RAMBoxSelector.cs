@@ -35,14 +35,44 @@ public class RAMBoxSelector : MonoBehaviour, IPointerClickHandler
 
     private void SelectAndReturn()
     {
-        // Seules les boîtes représentant une case RAM remplie sont sélectionnables.
-        // Les boîtes décor (int box, float box, ...) ne réagissent pas au clic.
+        // Boîte décor (int box, float box, ...) = CHOIX DU TYPE : cliquer ouvre
+        // le formulaire de déclaration avec ce type présélectionné.
         if (cellIndex < 0)
         {
-            Debug.Log($"[RAMBoxSelector] '{name}' est une boîte décor — clic ignoré.");
+            string type = TypeDeDecor();
+            if (type != null)
+            {
+                Debug.Log($"[RAMBoxSelector] Boîte de type '{type}' cliquée → formulaire.");
+                RamDeclarationUI.OuvrirPourType(type);
+            }
             return;
         }
         StartCoroutine(PickupAnimation());
+    }
+
+    /// <summary>Type représenté par une boîte décor (texte affiché ou nom d'un parent).</summary>
+    string TypeDeDecor()
+    {
+        // 1) Un texte de la boîte elle-même affiche le type (int, float, string, bool).
+        foreach (var tmp in GetComponentsInChildren<TMPro.TMP_Text>(true))
+        {
+            string txt = tmp.text.Trim().ToLowerInvariant();
+            if (txt == "int" || txt == "float" || txt == "string" || txt == "bool") return txt;
+        }
+        // 2) Sinon, un nom dans la chaîne des parents (ex : 'int box').
+        for (var t = transform; t != null; t = t.parent)
+        {
+            string n = t.name.ToLowerInvariant();
+            foreach (var k in new[] { "float", "string", "bool", "int" })
+                if (n.Contains(k)) return k;
+        }
+        // 3) Dernier recours : les textes de la racine complète.
+        foreach (var tmp in transform.root.GetComponentsInChildren<TMPro.TMP_Text>(true))
+        {
+            string txt = tmp.text.Trim().ToLowerInvariant();
+            if (txt == "int" || txt == "float" || txt == "string" || txt == "bool") return txt;
+        }
+        return null;
     }
 
     private System.Collections.IEnumerator PickupAnimation()

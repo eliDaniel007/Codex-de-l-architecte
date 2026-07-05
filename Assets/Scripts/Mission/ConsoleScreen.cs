@@ -5,7 +5,11 @@ using UnityEngine.InputSystem;
 #endif
 
 /// <summary>
-/// Affiche UNIQUEMENT la valeur sur le moniteur 3D dans l'environnement.
+/// L'écran de la console dans MainScene.
+///  • Console.WriteLine : on pose une box (reprise de la RAM) → la valeur s'affiche
+///    sur le moniteur 3D. Missions 2 et 6 (LectureRam) validées ici.
+///  • Console.ReadLine (mission 3, étape 1) : [E] → l'utilisateur « envoie » un
+///    nombre aléatoire, qui devient la box  string y  directement en main.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class ConsoleScreen : MonoBehaviour
@@ -21,6 +25,7 @@ public class ConsoleScreen : MonoBehaviour
     private PlayerHolder _holder;
     private TextMeshPro  _screenText;
     private bool         _inRange;
+    private float        _prochainMsgErreur; // anti-spam des messages d'erreur
 
     void Start()
     {
@@ -28,10 +33,20 @@ public class ConsoleScreen : MonoBehaviour
             foreach (var c in GetComponents<Collider>()) c.isTrigger = true;
 
         FindPlayer();
-        
+
         // Initialisation de l'affichage 3D sur le moniteur
         Transform anchor = screenFace != null ? screenFace : transform;
         _screenText = Setup3DMonitorText(anchor);
+
+        // Mission 3 : y est déclarée → l'écran attend que tu viennes chercher le nombre.
+        var gs = GameState.I;
+        var q  = gs.QueteActuelle();
+        if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 1)
+        {
+            MontrerSurMoniteur("<size=40%>Console.ReadLine()\n" +
+                               "<color=#FFD27F>En attente de récupération...</color>\n" +
+                               "Viens chercher le nombre  [E]</size>");
+        }
     }
 
     private void FindPlayer()
@@ -54,20 +69,60 @@ public class ConsoleScreen : MonoBehaviour
         if (!_inRange) return;
         if (_holder == null) { FindPlayer(); if (_holder == null) return; }
 
+        var gs = GameState.I;
+        var q  = gs.QueteActuelle();
+
         var held = _holder.HeldItem;
         var db   = held != null ? held.GetComponent<DataBox>() : null;
 
-        // Dès qu'on entre dans le périmètre de l'écran avec une box en main,
-        // on dépose automatiquement (plus de bouton E).
         if (db != null)
-            Afficher(held, db);
+        {
+            // ── Une box en main devant l'écran ──
+            if (q != null && !q.complete && q.kind == QuestKind.LectureRam)
+            {
+                if (db.variableName == q.cibleVariable && gs.boxVientDeRam)
+                {
+                    AfficherEtConsommer(held, db, valider: true);
+                }
+                else if (Time.time >= _prochainMsgErreur)
+                {
+                    _prochainMsgErreur = Time.time + 4f;
+                    AudioFX.Erreur();
+                    gs.SignalerErreur();
+                    PromptUI.Show($"L'écran attend <color=#00D9FF>{q.cibleVariable}</color> repris depuis la RAM. (Ta boîte n'est pas détruite.)");
+                }
+            }
+            else if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 2)
+            {
+                PromptUI.Show("Cette boîte va dans la <color=#00D9FF>RAM</color>, pas sur l'écran. Range y en mémoire !");
+            }
+            else if (q == null || gs.ToutesQuetesTerminees())
+            {
+                // Campagne finie : affichage libre (bac à sable).
+                AfficherEtConsommer(held, db, valider: false);
+            }
+            else
+            {
+                // Une mission est en cours et cette boîte ne va pas sur l'écran :
+                // on NE la détruit PAS (elle sert ailleurs — CPU ou RAM).
+                PromptUI.Show("Cette boîte n'est pas destinée à l'écran pour l'instant.");
+            }
+        }
+        else if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 1)
+        {
+            // ── Console.ReadLine : l'utilisateur envoie une valeur ──
+            PromptUI.Show("[E]  <color=#00D9FF>Console.ReadLine()</color>  —  recevoir la saisie de l'utilisateur");
+            if (AppuyeE()) RecevoirReadLine();
+        }
     }
 
-    void Afficher(PickupItem item, DataBox db)
+    // ── Console.WriteLine ─────────────────────────────────────────────────
+
+    void AfficherEtConsommer(PickupItem item, DataBox db, bool valider)
     {
         var gs = GameState.I;
-        bool   vientDeRam = gs.boxVientDeRam; // à capturer AVANT consommation
-        string valeur     = db.value;
+        string valeur    = db.value;
+        bool   estString = db.typeName == "string";
 
         if (_holder != null) _holder.ConsumeHeld();
         item.OnDropped();
@@ -76,59 +131,40 @@ public class ConsoleScreen : MonoBehaviour
         AudioFX.Depot();
         PromptUI.Hide();
 
-        // Validation des missions liées à l'écran
-        var q = gs.QueteActuelle();
-        if (q != null && !q.complete)
-        {
-            switch (q.kind)
-            {
-                case QuestKind.Affichage:
-                    gs.CompleterQueteActuelle();
-                    break;
+        if (valider) gs.CompleterQueteActuelle(); // missions 2 et 6
 
-                case QuestKind.Condition:
-                    if (double.TryParse(valeur.Replace(',', '.'),
-                            System.Globalization.NumberStyles.Any,
-                            System.Globalization.CultureInfo.InvariantCulture, out double v)
-                        && q.TesterCondition(v))
-                    {
-                        gs.CompleterQueteActuelle();
-                    }
-                    else
-                    {
-                        AudioFX.Erreur();
-                        gs.SignalerErreur();
-                        PromptUI.Show($"if (valeur {q.conditionOp} {q.conditionSeuil}) → <color=#FF6464>FAUX</color> avec {valeur}. Réessaie !");
-                        Invoke(nameof(CacherPrompt), 3.5f);
-                    }
-                    break;
-
-                case QuestKind.LectureRam:
-                    if (vientDeRam)
-                    {
-                        gs.CompleterQueteActuelle();
-                    }
-                    else
-                    {
-                        AudioFX.Erreur();
-                        gs.SignalerErreur();
-                        PromptUI.Show("Cette variable ne vient pas de la RAM. Va d'abord la reprendre dans la RAM !");
-                        Invoke(nameof(CacherPrompt), 3.5f);
-                    }
-                    break;
-            }
-        }
-
-        if (_screenText != null)
-        {
-            // Affiche UNIQUEMENT le nombre (ex: 25)
-            _screenText.text = valeur;
-            _screenText.gameObject.SetActive(true);
-            _screenText.transform.parent.gameObject.SetActive(true);
-        }
+        MontrerSurMoniteur(estString ? $"\"{valeur}\"" : valeur);
     }
 
-    void CacherPrompt() => PromptUI.Hide();
+    // ── Console.ReadLine (mission 3) ──────────────────────────────────────
+
+    /// <summary>L'utilisateur « tape » un nombre aléatoire → box  string y  en main.</summary>
+    void RecevoirReadLine()
+    {
+        string val = Random.Range(10, 100).ToString(); // le nombre envoyé par l'utilisateur
+
+        PromptUI.Hide();
+        MontrerSurMoniteur($"> {val}_"); // écho console
+
+        GameState.I.SaisirLigne(val); // → box  string y  directement en main
+    }
+
+    void MontrerSurMoniteur(string texte)
+    {
+        if (_screenText == null) return;
+        _screenText.text = texte;
+        _screenText.gameObject.SetActive(true);
+        _screenText.transform.parent.gameObject.SetActive(true);
+    }
+
+    static bool AppuyeE()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.E);
+#endif
+    }
 
     TextMeshPro Setup3DMonitorText(Transform anchor)
     {
@@ -138,25 +174,23 @@ public class ConsoleScreen : MonoBehaviour
 
         var root = new GameObject("3D_Display_Root");
         root.transform.SetParent(anchor, false);
-        
+
         // Positionnement sur la face avant qui s'affichait précédemment
         root.transform.localPosition = new Vector3(-18.7f, 35.8f, 0f);
-        
+
         // On remet une rotation droite (0 sur Z)
-        root.transform.localRotation = Quaternion.Euler(0, 90, 0); 
-        
-        // Plus de fond noir ("gros truc noir") comme demandé
-        
+        root.transform.localRotation = Quaternion.Euler(0, 90, 0);
+
         // Texte 3D (TextMeshPro)
         var txtGO = new GameObject("3D_Monitor_Text");
         txtGO.transform.SetParent(root.transform, false);
         var tmp = txtGO.AddComponent<TextMeshPro>();
-        tmp.fontSize = 80f; 
+        tmp.fontSize = 80f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = new Color(0, 1, 0.5f); // Vert console
         tmp.richText = true;
         tmp.rectTransform.sizeDelta = new Vector2(110f, 65f);
-        
+
         root.SetActive(false); // Caché par défaut
 
         return tmp;

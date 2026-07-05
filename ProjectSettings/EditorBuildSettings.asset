@@ -17,5 +17,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/CPU.unity
     guid: 22ae0c38c4b74a578d3e9f3825edbc20
+  - enabled: 1
+    path: Assets/Scenes/Calculateur.unity
+    guid: 75a77017f5054b769ea2b9d01f560249
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

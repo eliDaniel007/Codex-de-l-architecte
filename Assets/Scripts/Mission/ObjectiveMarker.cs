@@ -82,42 +82,38 @@ public class ObjectiveMarker : MonoBehaviour
         var gs = GameState.I;
         var q  = gs.QueteActuelle();
 
-        if (q != null && !q.complete && !gs.ToutesQuetesTerminees())
+        if (gs.BriefingEnAttente())
+        {
+            // Briefing à recevoir → on pointe vers le CPU.
+            _cible = TourCpu();
+        }
+        else if (q != null && !q.complete && !gs.ToutesQuetesTerminees())
         {
             switch (q.kind)
             {
-                case QuestKind.Visite:
-                    // Vise la tour du Processeur (modèle 3D), sinon la zone.
-                    var tour = GameObject.Find("Processeur");
-                    if (tour != null) _cible = tour.transform;
-                    else
-                    {
-                        var cpu = FindFirstObjectByType<CPUZone>();
-                        if (cpu != null) _cible = cpu.transform;
-                    }
+                // 1. int x = 4;  → déclarer dans la RAM.
+                case QuestKind.DeclarationRam:
+                    _cible = PortailRam();
                     break;
 
-                case QuestKind.Declaration:
-                case QuestKind.Question:
-                case QuestKind.Saisie:
-                case QuestKind.Correction:
-                    _cible = ClavierLePlusProche();
-                    break;
-
-                // Box en main → destination ; sinon → d'abord le clavier.
-                case QuestKind.Rangement:
-                case QuestKind.Compteur:
-                    _cible = gs.boxExists ? PortailRam() : ClavierLePlusProche();
-                    break;
-
-                case QuestKind.Affichage:
-                case QuestKind.Condition:
-                    _cible = gs.boxExists ? Ecran() : ClavierLePlusProche();
-                    break;
-
-                // Box en main (reprise) → écran ; sinon → aller la chercher en RAM.
+                // 2/6. Console.WriteLine(...) : copie en main → écran ; sinon → RAM.
                 case QuestKind.LectureRam:
-                    _cible = gs.boxExists ? Ecran() : PortailRam();
+                    _cible = (gs.boxExists && gs.boxVientDeRam) ? Ecran() : PortailRam();
+                    break;
+
+                // 3. string y = Console.ReadLine() : déclarer y (RAM) → écran → ranger (RAM).
+                case QuestKind.SaisieEcran:
+                    _cible = (gs.missionEtape == 1) ? Ecran() : PortailRam();
+                    break;
+
+                // 4. z = Int32.Parse(y) : y en main → CPU ; z en main → RAM ; sinon → RAM.
+                case QuestKind.Parse:
+                    _cible = (gs.boxExists && gs.missionEtape == 0) ? TourCpu() : PortailRam();
+                    break;
+
+                // 5. somme = x + z : x ou z en main → CPU ; somme en main → RAM ; sinon → RAM.
+                case QuestKind.Calcul:
+                    _cible = (gs.boxExists && gs.missionEtape <= 1) ? TourCpu() : PortailRam();
                     break;
             }
         }
@@ -145,6 +141,14 @@ public class ObjectiveMarker : MonoBehaviour
         Bounds b = rends[0].bounds;
         for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
         return new Vector3(b.center.x, b.max.y + hauteur * 0.5f, b.center.z);
+    }
+
+    Transform TourCpu()
+    {
+        var tour = GameObject.Find("Processeur");
+        if (tour != null) return tour.transform;
+        var cpu = FindFirstObjectByType<CPUZone>();
+        return cpu != null ? cpu.transform : null;
     }
 
     Transform PortailRam()
@@ -243,15 +247,19 @@ public class ObjectiveMarker : MonoBehaviour
         }
         d.GetComponent<Renderer>().material = mat;
 
-        // Distance sous le losange
+        // Distance sous le losange (bien lisible : gros + contour noir)
         var txtGO = new GameObject("Distance");
         txtGO.transform.SetParent(_marker.transform, false);
-        txtGO.transform.localPosition = new Vector3(0f, -0.85f, 0f);
+        txtGO.transform.localPosition = new Vector3(0f, -0.95f, 0f);
         _label = txtGO.AddComponent<TextMeshPro>();
-        _label.fontSize  = 5f;
-        _label.alignment = TextAlignmentOptions.Center;
-        _label.color     = Color.white;
-        _label.rectTransform.sizeDelta = new Vector2(4f, 1.2f);
+        _label.text         = "-- m";
+        _label.fontSize     = 9f;
+        _label.alignment    = TextAlignmentOptions.Center;
+        _label.color        = new Color(0f, 0.9f, 1f);
+        _label.fontStyle    = FontStyles.Bold;
+        _label.outlineWidth = 0.25f;
+        _label.outlineColor = new Color32(0, 0, 0, 235);
+        _label.rectTransform.sizeDelta = new Vector2(8f, 2.2f);
 
         _marker.SetActive(false);
     }

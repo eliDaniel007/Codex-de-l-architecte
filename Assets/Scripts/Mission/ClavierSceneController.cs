@@ -36,13 +36,14 @@ public class ClavierSceneController : MonoBehaviour
     private Quest           _saisie;     // quête Console.ReadLine active, sinon null
     private Quest           _correction; // quête Debug (ligne à corriger), sinon null
     private bool            _verrouille; // bloque la saisie pendant la transition
+    private bool            _ready;      // n'accepte la saisie qu'après relâche des touches de déplacement
 
     void Start()
     {
         var q = GameState.I.QueteActuelle();
-        _question   = (q != null && q.kind == QuestKind.Question   && !q.complete) ? q : null;
-        _saisie     = (q != null && q.kind == QuestKind.Saisie     && !q.complete) ? q : null;
-        _correction = (q != null && q.kind == QuestKind.Correction && !q.complete) ? q : null;
+        _question    = (q != null && q.kind == QuestKind.Question   && !q.complete) ? q : null;
+        _saisie      = (q != null && q.kind == QuestKind.Saisie     && !q.complete) ? q : null;
+        _correction  = (q != null && q.kind == QuestKind.Correction && !q.complete) ? q : null;
 
         ConstruireUI();
         ActualiserLigne();
@@ -64,6 +65,27 @@ public class ClavierSceneController : MonoBehaviour
     void Update()
     {
         if (_verrouille) return;
+
+        // Anti « wwww » : on n'accepte la saisie qu'une fois les touches de
+        // déplacement (Z/Q/S/D/W/A) relâchées après l'entrée dans la scène.
+        if (!_ready)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var k = Keyboard.current;
+            bool deplacement = k != null && (k.wKey.isPressed || k.aKey.isPressed ||
+                                             k.sKey.isPressed || k.dKey.isPressed ||
+                                             k.zKey.isPressed || k.qKey.isPressed ||
+                                             k.upArrowKey.isPressed || k.downArrowKey.isPressed ||
+                                             k.leftArrowKey.isPressed || k.rightArrowKey.isPressed);
+#else
+            bool deplacement = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) ||
+                               Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D) ||
+                               Input.GetKey(KeyCode.Z) || Input.GetKey(KeyCode.Q);
+#endif
+            if (!deplacement) { _ready = true; _buffer = ""; ActualiserLigne(); }
+            return;
+        }
+
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb == null) return;
@@ -88,7 +110,7 @@ public class ClavierSceneController : MonoBehaviour
 
     void OnCaractere(char c)
     {
-        if (_verrouille) return;
+        if (_verrouille || !_ready) return; // ignore les touches tant que pas prêt (anti wwww)
         if (char.IsControl(c)) return;
         _buffer += c;
         ActualiserLigne();
@@ -166,6 +188,14 @@ public class ClavierSceneController : MonoBehaviour
             return;
         }
 
+        // 1b) Déclaration VIDE : type nom;  (ex : float z;)
+        var mVide = Regex.Match(input, @"^(int|float|string|bool|char)\s+([a-zA-Z_]\w*)\s*;?$");
+        if (mVide.Success)
+        {
+            DeclarerVide(mVide.Groups[1].Value, mVide.Groups[2].Value);
+            return;
+        }
+
         // 2) Affichage : Console.WriteLine(valeur);
         var mWL = Regex.Match(input, @"^Console\.WriteLine\((.+)\)\s*;?$");
         if (mWL.Success)
@@ -174,7 +204,20 @@ public class ClavierSceneController : MonoBehaviour
             return;
         }
 
-        Erreur("Syntaxe : <type> nom = valeur;   ou   Console.WriteLine(valeur);");
+        Erreur("Syntaxe : <type> nom = valeur;   ou   <type> nom;   ou   Console.WriteLine(valeur);");
+    }
+
+    /// <summary>Déclaration sans valeur (ex : float z;). Ne crée pas de box.</summary>
+    void DeclarerVide(string type, string name)
+    {
+        // Box VIDE (valeur "") : la boîte part dans la main, le joueur va la ranger en RAM.
+        Color c = (type == "float") ? new Color(1f, 0.4f, 0.7f) : new Color(0.6f, 0.6f, 0.65f);
+        GameState.I.EnregistrerBox(name, "", type, c);
+        GameState.I.spawnDansLaMain = true;
+        GameState.I.clavierJustVisited = true;
+        GameState.I.CompleterSiKind(QuestKind.Declaration);
+        Succes($"{type} {name};   (déclarée, vide)");
+        TerminerEtRevenir();
     }
 
     /// <summary>Valide une déclaration de variable (tous types + expressions).</summary>
@@ -222,7 +265,7 @@ public class ClavierSceneController : MonoBehaviour
         }
 
         GameState.I.EnregistrerBox(name, stored, type, boxColor);
-        GameState.I.spawnDansLaMain   = true;   // boîte directement en main
+        GameState.I.spawnDansLaMain = true;   // boîte directement en main (on la portera jusqu'à la RAM)
         GameState.I.clavierJustVisited = true;
         GameState.I.CompleterSiKind(QuestKind.Declaration); // valide la quête si besoin
 

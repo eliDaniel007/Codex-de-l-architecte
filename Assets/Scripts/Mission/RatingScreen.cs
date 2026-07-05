@@ -20,6 +20,9 @@ public class RatingScreen : MonoBehaviour
     private Canvas _canvas;
     private bool   _visible;
 
+    /// <summary>Vrai quand l'écran de rating est affiché (pour bloquer le menu pause).</summary>
+    public static bool Visible => Instance != null && Instance._visible;
+
     public static void Afficher()
     {
         if (Instance == null)

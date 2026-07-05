@@ -2,16 +2,18 @@ using UnityEngine;
 
 /// <summary>
 /// Attach to the Player GameObject.
-/// Manages the single item the player can carry at a time.
-/// Set HoldPoint to a child Transform positioned ~1 m in front of the camera.
+/// Gère l'unique objet que le joueur transporte — posé sur sa TÊTE comme
+/// enfant (position locale 0,0,0 du point de portage).
+/// Le point de portage 'holdPoint' est placé au-dessus de la tête ; tu peux
+/// créer un enfant et l'assigner pour ajuster précisément la position.
 /// </summary>
 public class PlayerHolder : MonoBehaviour
 {
-    [Tooltip("Empty child GameObject positioned in front of the player where the held item floats.")]
+    [Tooltip("Point de portage sur la tête. Laissé vide → créé automatiquement.")]
     public Transform holdPoint;
 
-    [Tooltip("Smooth-follow speed while carrying an item.")]
-    public float followSpeed = 20f;
+    [Tooltip("Hauteur du point de portage au-dessus du pivot du joueur.")]
+    public float hauteurTete = 1.95f;
 
     public PickupItem HeldItem { get; private set; }
 
@@ -23,30 +25,38 @@ public class PlayerHolder : MonoBehaviour
         EnsureHoldPoint();
         HeldItem = item;
         item.OnPicked();
+
+        // Enfant du point de portage (sur la tête), position locale 0,0,0.
+        item.transform.SetParent(holdPoint, false);
+        item.transform.localPosition = Vector3.zero;
+        item.transform.localRotation = Quaternion.identity;
         return true;
     }
 
     private void EnsureHoldPoint()
     {
         if (holdPoint != null) return;
-        
+
         var hp = new GameObject("HoldPoint");
         hp.transform.SetParent(transform);
-        hp.transform.localPosition = new Vector3(0f, 1.2f, 1.5f);
+        hp.transform.localPosition = new Vector3(0f, hauteurTete, 0f); // sur la tête
+        hp.transform.localRotation = Quaternion.identity;
         holdPoint = hp.transform;
     }
 
-    /// <summary>Drop the held item at its current world position.</summary>
+    /// <summary>Lâche l'objet porté à sa position actuelle dans le monde.</summary>
     public void Drop()
     {
         if (HeldItem == null) return;
+        HeldItem.transform.SetParent(null, true);
         HeldItem.OnDropped();
         HeldItem = null;
     }
 
-    /// <summary>Remove the held item without restoring it (it was consumed).</summary>
+    /// <summary>Retire l'objet porté sans le restituer (il a été consommé).</summary>
     public void ConsumeHeld()
     {
+        if (HeldItem != null) HeldItem.transform.SetParent(null, true);
         HeldItem = null;
     }
 
@@ -56,24 +66,5 @@ public class PlayerHolder : MonoBehaviour
     {
         PromptUI.EnsureInstance();
         EnsureHoldPoint();
-    }
-
-    private void LateUpdate()
-    {
-        if (HeldItem == null) return;
-
-        // Animation de flottement (bobbing)
-        float bob = Mathf.Sin(Time.time * 3f) * 0.05f;
-        Vector3 targetPos = holdPoint.position + Vector3.up * bob;
-
-        HeldItem.transform.position = Vector3.Lerp(
-            HeldItem.transform.position,
-            targetPos,
-            Time.deltaTime * followSpeed);
-
-        HeldItem.transform.rotation = Quaternion.Lerp(
-            HeldItem.transform.rotation,
-            holdPoint.rotation,
-            Time.deltaTime * followSpeed);
     }
 }

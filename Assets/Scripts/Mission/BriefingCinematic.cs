@@ -27,6 +27,11 @@ public class BriefingCinematic : MonoBehaviour
     private GameObject  _overlay;
     private TextMeshProUGUI _labelStation;
     private bool        _skip;
+    private readonly System.Collections.Generic.List<MonoBehaviour> _geles
+        = new System.Collections.Generic.List<MonoBehaviour>();
+
+    /// <summary>Vrai pendant la cinématique (pour bloquer le menu pause).</summary>
+    public static bool EnCours { get; private set; }
 
     public static void Ensure()
     {
@@ -63,12 +68,30 @@ public class BriefingCinematic : MonoBehaviour
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        if (scene.name != GameState.I.mainSceneName)
+        {
+            // Une autre scène se charge pendant la cinématique → on l'interrompt
+            // proprement (les objets de la MainScene sont détruits).
+            if (EnCours) Interrompre();
+            return;
+        }
+
         if (_dejaJouee) return;
-        if (scene.name != GameState.I.mainSceneName) return;
 
         // Automatique à chaque lancement du jeu (une fois par session).
         _dejaJouee = true;
         StartCoroutine(Jouer());
+    }
+
+    /// <summary>Arrête la cinématique et nettoie (changement de scène inattendu).</summary>
+    void Interrompre()
+    {
+        StopAllCoroutines();
+        if (_overlay != null) Destroy(_overlay);
+        _overlay = null;
+        _cam     = null;
+        _geles.Clear(); // les composants gelés appartenaient à la scène détruite
+        EnCours  = false;
     }
 
     void Update()
@@ -83,6 +106,7 @@ public class BriefingCinematic : MonoBehaviour
 
     IEnumerator Jouer()
     {
+        EnCours = true;
         yield return null; // laisse la scène s'initialiser
 
         var mainCam = Camera.main;
@@ -91,16 +115,18 @@ public class BriefingCinematic : MonoBehaviour
         var joueur = GameObject.FindGameObjectWithTag("Player");
         Vector3 posJoueur = joueur != null ? joueur.transform.position : mainCam.transform.position;
 
+        // Le joueur est GELÉ pendant la cinématique : sinon il peut marcher dans
+        // une zone (CPU, RAM...) qui change de scène et détruit nos caméras.
+        GelerJoueur(joueur, true);
+
         // Étapes du survol : (nom affiché, cible)
         var etapes = new System.Collections.Generic.List<(string nom, Transform cible)>();
         var cpu     = GameObject.Find("Processeur");
-        var clavier = FindFirstObjectByType<KeyboardTerminal>();
         var portail = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
         var ecran   = FindFirstObjectByType<ConsoleScreen>();
-        if (cpu     != null) etapes.Add(("CPU — le centre des objectifs",  cpu.transform));
-        if (clavier != null) etapes.Add(("CLAVIER — déclare tes variables", clavier.transform));
-        if (portail != null) etapes.Add(("RAM — la mémoire de stockage",   portail.transform));
-        if (ecran   != null) etapes.Add(("ÉCRAN — affiche tes résultats",  ecran.transform));
+        if (cpu     != null) etapes.Add(("CPU — lit le programme et calcule",          cpu.transform));
+        if (portail != null) etapes.Add(("RAM — déclare et range tes variables",       portail.transform));
+        if (ecran   != null) etapes.Add(("ÉCRAN — Console : affichage et saisie",      ecran.transform));
         if (etapes.Count == 0) yield break;
 
         // Caméra de cinématique (au-dessus de la caméra joueur).
@@ -114,7 +140,8 @@ public class BriefingCinematic : MonoBehaviour
         foreach (var (nom, cible) in etapes)
         {
             if (_skip) break;
-            _labelStation.text = nom;
+            if (camGO == null || cible == null) break; // scène changée / objet détruit
+            if (_labelStation != null) _labelStation.text = nom;
 
             Vector3 sommet = SommetDe(cible);
             Vector3 recul  = (posJoueur - sommet); recul.y = 0f;
@@ -126,6 +153,7 @@ public class BriefingCinematic : MonoBehaviour
             float t = 0f;
             while (t < 1f && !_skip)
             {
+                if (camGO == null) break; // détruit par un chargement de scène
                 t += Time.deltaTime / dureeDeplacement;
                 float k = Mathf.SmoothStep(0f, 1f, t);
                 camGO.transform.position = Vector3.Lerp(dep, destination, k);
@@ -138,15 +166,16 @@ public class BriefingCinematic : MonoBehaviour
             while (pause < dureePause && !_skip) { pause += Time.deltaTime; yield return null; }
         }
 
-        // Retour vers la vue du joueur.
-        if (!_skip)
+        // Retour vers la vue du joueur (si tout existe encore).
+        if (!_skip && camGO != null && mainCam != null)
         {
             Vector3 dep = camGO.transform.position;
             Quaternion rotDep = camGO.transform.rotation;
-            _labelStation.text = "À toi de jouer, agent.";
+            if (_labelStation != null) _labelStation.text = "À toi de jouer, agent.";
             float t = 0f;
             while (t < 1f && !_skip)
             {
+                if (camGO == null || mainCam == null) break; // scène changée en plein vol
                 t += Time.deltaTime / 1.4f;
                 float k = Mathf.SmoothStep(0f, 1f, t);
                 camGO.transform.position = Vector3.Lerp(dep, mainCam.transform.position, k);
@@ -155,9 +184,36 @@ public class BriefingCinematic : MonoBehaviour
             }
         }
 
-        Destroy(camGO);
-        Destroy(_overlay);
+        if (camGO    != null) Destroy(camGO);
+        if (_overlay != null) Destroy(_overlay);
         _cam = null;
+        GelerJoueur(null, false); // rend les commandes au joueur
+        EnCours = false;
+    }
+
+    /// <summary>Active/désactive les contrôleurs du joueur pendant la cinématique.</summary>
+    void GelerJoueur(GameObject joueur, bool geler)
+    {
+        if (geler)
+        {
+            _geles.Clear();
+            if (joueur == null) return;
+            foreach (var mb in joueur.GetComponentsInChildren<MonoBehaviour>())
+            {
+                if (mb == null) continue;
+                string n = mb.GetType().Name;
+                if (n.Contains("ThirdPersonController") || n.Contains("StarterAssetsInputs") ||
+                    n.Contains("PlayerInput"))
+                {
+                    if (mb.enabled) { mb.enabled = false; _geles.Add(mb); }
+                }
+            }
+        }
+        else
+        {
+            foreach (var mb in _geles) if (mb != null) mb.enabled = true;
+            _geles.Clear();
+        }
     }
 
     // ── overlay cinéma ────────────────────────────────────────────────────

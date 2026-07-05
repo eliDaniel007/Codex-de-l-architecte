@@ -90,13 +90,8 @@ public class MemoryCell : MonoBehaviour
                 return;
             }
 
-            // DÉPÔT : Si on porte une box, on la met en RAM avant d'entrer
-            if (gs.boxExists)
-            {
-                gs.DeposerEnRam();
-                Debug.Log($"[MemoryCell] Box {gs.ramVariable} déposée en RAM.");
-            }
-
+            // On garde la box en main : la scène RAM la range elle-même dans les
+            // cases multiples (DeposerAuto) — ne pas la consommer ici.
             PromptUI.Hide();
             Debug.Log($"[MemoryCell] [E] pressé → chargement de '{ramSceneName}'");
             SceneManager.LoadScene(ramSceneName);

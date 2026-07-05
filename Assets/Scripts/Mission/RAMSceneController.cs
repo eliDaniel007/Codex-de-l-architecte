@@ -33,6 +33,8 @@ public class RAMSceneController : MonoBehaviour
     private Transform        _templateRoot; // racine complète de la boîte « variable »
     private List<Transform>  _boxes;        // boîte affichée par case (racine + clones)
     private List<Vector3>    _slotPos;      // position monde de chaque case
+    // Couleur réelle des boîtes de TYPE de la scène (int box, float box, ...)
+    private readonly Dictionary<string, Color> _couleursDecor = new Dictionary<string, Color>();
 
     void Start()
     {
@@ -49,6 +51,8 @@ public class RAMSceneController : MonoBehaviour
             ? $"[RAM] Boîte modèle : racine '{_templateRoot.name}' (toute la boîte est gérée d'un bloc)"
             : "[RAM] ATTENTION : boîte modèle 'variable' introuvable — dépôt quand même, affichage impossible.");
 
+        ScannerCouleursDecor(); // couleurs réelles des boîtes de type (int box, ...)
+
         if (_templateRoot != null) CalculerSlots();
         else _slotPos = new List<Vector3>();
 
@@ -63,6 +67,10 @@ public class RAMSceneController : MonoBehaviour
             Debug.LogWarning("[RAM] RAM pleine : la box reste en main.");
 
         if (_templateRoot != null) ConstruireBoites();
+
+        // Formulaire « déclarer une variable » (mission 1 + usage libre).
+        var ui = new GameObject("[RamDeclarationUI]");
+        ui.AddComponent<RamDeclarationUI>();
     }
 
     int CompterPleines()
@@ -74,6 +82,8 @@ public class RAMSceneController : MonoBehaviour
 
     void Update()
     {
+        if (RamDeclarationUI.PanneauOuvert) return; // le formulaire gère ses touches
+
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) Retour();
 #else
@@ -85,6 +95,61 @@ public class RAMSceneController : MonoBehaviour
     {
         GameState.I.RetourSansDepot(); // si on tient encore une box (RAM pleine), on la régénère
         SceneManager.LoadScene(GameState.I.mainSceneName);
+    }
+
+    // ── couleurs des boîtes de type (décor) ──────────────────────────────
+
+    /// <summary>
+    /// Repère les boîtes de TYPE de la scène (int box, float box, ...) et mémorise
+    /// leur couleur de carton : les variables déclarées reprendront EXACTEMENT
+    /// cette couleur (int déclaré = même couleur que la boîte int).
+    /// </summary>
+    void ScannerCouleursDecor()
+    {
+        var selectors = FindObjectsByType<RAMBoxSelector>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var racines = new HashSet<Transform>();
+        foreach (var sel in selectors)
+        {
+            var root = sel.transform.root;
+            if (_templateRoot != null && root == _templateRoot) continue; // pas la boîte variable
+            racines.Add(root);
+        }
+
+        foreach (var root in racines)
+        {
+            string type = TypeDeRacine(root);
+            if (type == null || _couleursDecor.ContainsKey(type)) continue;
+            var col = CouleurPrincipale(root);
+            if (col.HasValue) _couleursDecor[type] = col.Value;
+        }
+
+        Debug.Log($"[RAM] Couleurs de type détectées : {string.Join(", ", _couleursDecor.Keys)}");
+    }
+
+    static string TypeDeRacine(Transform root)
+    {
+        foreach (var tmp in root.GetComponentsInChildren<TMP_Text>(true))
+        {
+            string txt = tmp.text.Trim().ToLowerInvariant();
+            if (txt == "int" || txt == "float" || txt == "string" || txt == "bool") return txt;
+        }
+        string n = root.name.ToLowerInvariant();
+        foreach (var k in new[] { "float", "string", "bool", "int" })
+            if (n.Contains(k)) return k;
+        return null;
+    }
+
+    static Color? CouleurPrincipale(Transform root)
+    {
+        foreach (var rend in root.GetComponentsInChildren<Renderer>(true))
+        {
+            if (rend.GetComponent<TMP_Text>() != null) continue;
+            var mat = rend.sharedMaterial;
+            if (mat == null) continue;
+            if (mat.HasProperty("_BaseColor")) return mat.GetColor("_BaseColor");
+            if (mat.HasProperty("_Color"))     return mat.color;
+        }
+        return null;
     }
 
     // ── détection du modèle ───────────────────────────────────────────────
@@ -126,51 +191,79 @@ public class RAMSceneController : MonoBehaviour
         _slotPos = new List<Vector3>();
         Vector3 origine = _templateRoot.position;
 
-        // Largeur de la boîte (monde) pour l'espacement.
-        float largeur = 1f;
-        var rend = _templateRoot.GetComponentInChildren<Renderer>();
-        if (rend != null) largeur = Mathf.Max(0.1f, rend.bounds.size.x);
-
-        float dx   = largeur * facteurEspacement;
-        float trou = largeur * facteurTrou;
-
-        // Décalages de colonnes : 2 boîtes, espace, 2 boîtes.
-        var cols = new List<float>();
-        for (int c = 0; c < boitesParTablette; c++)
-        {
-            float x = c * dx;
-            if (c >= boitesParTablette / 2) x += trou;
-            cols.Add(x);
-        }
-
-        // Tablettes : la rangée du modèle d'abord, puis les autres (Wooden Shelf*).
-        var deltas = new List<Vector3> { Vector3.zero };
+        // ── Tablettes : 'Wooden Shelf*' à N'IMPORTE quelle profondeur ──
+        // (on ne garde que la racine de chaque étagère, pas ses sous-objets)
         var shelves = new List<Transform>();
         foreach (var t in FindObjectsByType<Transform>(FindObjectsSortMode.None))
-            if (t.parent == null && t.name.StartsWith("Wooden Shelf"))
-                shelves.Add(t);
-
-        if (shelves.Count > 1)
         {
-            // Tablette la plus proche du modèle = sa rangée de référence.
-            Transform refShelf = shelves[0];
-            float best = float.MaxValue;
-            foreach (var s in shelves)
-            {
-                float d = Vector3.Distance(s.position, origine);
-                if (d < best) { best = d; refShelf = s; }
-            }
-            // Les autres tablettes donnent les décalages de rangée.
-            var autres = new List<Transform>();
-            foreach (var s in shelves) if (s != refShelf) autres.Add(s);
-            autres.Sort((a, b) => b.position.z.CompareTo(a.position.z));
-            foreach (var s in autres) deltas.Add(s.position - refShelf.position);
+            if (!t.name.StartsWith("Wooden Shelf")) continue;
+            bool sousObjet = false;
+            for (var p = t.parent; p != null; p = p.parent)
+                if (p.name.StartsWith("Wooden Shelf")) { sousObjet = true; break; }
+            if (!sousObjet) shelves.Add(t);
         }
 
+        // Pas d'étagère trouvée : simple rangée serrée alignée sur la boîte modèle.
+        if (shelves.Count == 0)
+        {
+            float dx = LargeurBoite() * 1.15f;
+            for (int c = 0; c < 3; c++)
+                _slotPos.Add(origine + new Vector3(c * dx, 0f, 0f));
+            Debug.LogWarning("[RAM] Aucune 'Wooden Shelf' trouvée : rangée simple autour du modèle.");
+            return;
+        }
+
+        // Étagère de référence = la plus proche de la boîte modèle.
+        Transform refShelf = shelves[0];
+        float best = float.MaxValue;
+        foreach (var s in shelves)
+        {
+            float d = Vector3.Distance(s.position, origine);
+            if (d < best) { best = d; refShelf = s; }
+        }
+
+        // Rangées : la référence d'abord (hauteur/profondeur du modèle), puis les autres.
+        var deltas = new List<Vector3> { Vector3.zero };
+        var autres = new List<Transform>();
+        foreach (var s in shelves) if (s != refShelf) autres.Add(s);
+        autres.Sort((a, b) => b.position.z.CompareTo(a.position.z));
+        foreach (var s in autres) deltas.Add(s.position - refShelf.position);
+
+        // ── Colonnes : 3 boîtes par tablette, resserrées au centre du meuble ──
+        // (3 en haut + 3 en bas : au-delà de 3 par ligne, la 4e sortait du meuble)
+        Bounds b = BoundsDe(refShelf);
+        float marge  = LargeurBoite() * 0.6f;
+        float x0 = b.min.x + marge;
+        float x1 = b.max.x - marge;
+        if (x1 <= x0) { x0 = b.center.x; x1 = b.center.x; }
+
+        float centre = (x0 + x1) * 0.5f;
+        float ecart  = Mathf.Min(LargeurBoite() * 1.15f, (x1 - x0) * 0.5f); // boîtes proches
+
+        var cols = new List<float> { centre - ecart, centre, centre + ecart };
+
         // Cases en ordre : rangée du modèle d'abord, colonne par colonne.
+        // Hauteur/profondeur = celles de la boîte modèle (posée sur sa tablette).
         foreach (var delta in deltas)
             foreach (var x in cols)
-                _slotPos.Add(origine + delta + new Vector3(x, 0f, 0f));
+                _slotPos.Add(new Vector3(x, origine.y, origine.z) + delta);
+
+        Debug.Log($"[RAM] {shelves.Count} étagère(s), {_slotPos.Count} case(s) visibles dans la largeur [{x0:0.0} → {x1:0.0}].");
+    }
+
+    float LargeurBoite()
+    {
+        var rend = _templateRoot != null ? _templateRoot.GetComponentInChildren<Renderer>() : null;
+        return rend != null ? Mathf.Max(0.1f, rend.bounds.size.x) : 1f;
+    }
+
+    static Bounds BoundsDe(Transform t)
+    {
+        var rends = t.GetComponentsInChildren<Renderer>();
+        if (rends.Length == 0) return new Bounds(t.position, Vector3.one);
+        Bounds b = rends[0].bounds;
+        for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+        return b;
     }
 
     // ── affichage ─────────────────────────────────────────────────────────
@@ -229,12 +322,22 @@ public class RAMSceneController : MonoBehaviour
             s.typeName      = slot.type;
         }
 
-        // Mêmes textes que la boîte d'origine : 'nom' et 'valeur'.
+        // Couleur du type : int = rouge, float = rose, string = violet, bool = vert.
+        Color couleurType = GameState.CouleurType(slot.type);
+
+        // Le CARTON reprend la couleur RÉELLE de la boîte de type de la scène
+        // (int déclaré = même carton que la boîte « int box »). Palette en secours.
+        Color couleurCarton = _couleursDecor.TryGetValue(slot.type, out var cd) ? cd : couleurType;
+        GameState.TeinterBoite(box, couleurCarton);
+        slot.color = couleurCarton; // la boîte portée gardera la même couleur
+
+        // Mêmes textes que la boîte d'origine : 'nom', 'valeur' et 'Type'.
         foreach (var tmp in box.GetComponentsInChildren<TMP_Text>(true))
         {
             string n = tmp.gameObject.name.Trim().ToLowerInvariant();
-            if      (n == "nom")    tmp.text = slot.variable;
-            else if (n == "valeur") tmp.text = slot.value;
+            if      (n == "nom")    { tmp.text = slot.variable; tmp.color = couleurType; }
+            else if (n == "valeur") { tmp.text = slot.value;    tmp.color = couleurType; }
+            else if (n == "type")   { tmp.text = slot.type;     tmp.color = couleurType; }
         }
     }
 }

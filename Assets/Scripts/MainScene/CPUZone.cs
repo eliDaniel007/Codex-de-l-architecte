@@ -51,6 +51,9 @@ public class CPUZone : MonoBehaviour
 
     void Update()
     {
+        // Pas de changement de scène pendant la cinématique de briefing.
+        if (BriefingCinematic.EnCours) return;
+
         if (_player == null) { TrouverJoueur(); if (_player == null) return; }
 
         float dist = DistanceAuJoueur();
@@ -78,13 +81,25 @@ public class CPUZone : MonoBehaviour
     {
         _armed = false;
         GameState.I.cpuJustVisited = true;
-        Debug.Log($"[CPUZone] Joueur à portée → chargement de '{cpuSceneName}'");
-        SceneManager.LoadScene(cpuSceneName);
+
+        // Missions 4 et 5 : si on apporte la bonne boîte, on va dans la scène
+        // CALCULATEUR (le CPU traite la variable) au lieu de l'écran du programme.
+        var gs = GameState.I;
+        var q  = gs.QueteActuelle();
+        bool versCalculateur = q != null && gs.boxExists &&
+            ((q.kind == QuestKind.Parse  && gs.missionEtape == 0 && gs.boxVariable == "y") || // z = Int32.Parse(y)
+             (q.kind == QuestKind.Calcul && gs.missionEtape == 0 && gs.boxVariable == "x") || // somme = x + z (x)
+             (q.kind == QuestKind.Calcul && gs.missionEtape == 1 && gs.boxVariable == "z"));  // somme = x + z (z)
+
+        string scene = versCalculateur ? "Calculateur" : cpuSceneName;
+        Debug.Log($"[CPUZone] Joueur à portée → chargement de '{scene}'");
+        SceneManager.LoadScene(scene);
     }
 
     // Bonus : si un Collider trigger est présent, on accepte aussi cette voie.
     void OnTriggerEnter(Collider other)
     {
+        if (BriefingCinematic.EnCours) return;
         if (!_armed || !other.CompareTag(playerTag)) return;
         EntrerCPU();
     }

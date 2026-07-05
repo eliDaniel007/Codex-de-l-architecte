@@ -84,9 +84,18 @@ public class MissionHUD : MonoBehaviour
 
         if (q == null || gs.ToutesQuetesTerminees())
         {
-            _numero.text     = "MISSIONS";
-            _titre.text      = "Toutes les missions sont terminées !";
+            _numero.text     = "PROGRAMME";
+            _titre.text      = "Programme exécuté avec succès !";
             _indication.text = "Bravo, architecte.";
+            return;
+        }
+
+        // Briefing : la ligne n'est révélée qu'après une visite au CPU.
+        if (gs.BriefingEnAttente())
+        {
+            _numero.text     = $"LIGNE {gs.questIndex + 1}/{gs.quests.Count}";
+            _titre.text      = "Briefing requis";
+            _indication.text = "Rends-toi au CPU pour lire la prochaine ligne du programme.";
             return;
         }
 
@@ -94,7 +103,7 @@ public class MissionHUD : MonoBehaviour
             ? $"  <color=#FFD27F>({q.compteur}/{q.objectifCompteur})</color>"
             : "";
 
-        _numero.text     = $"MISSION {gs.questIndex + 1}/{gs.quests.Count}";
+        _numero.text     = $"LIGNE {gs.questIndex + 1}/{gs.quests.Count}";
         _titre.text      = q.titre + progression;
         _indication.text = string.IsNullOrEmpty(q.indication) ? q.description : q.indication;
     }
