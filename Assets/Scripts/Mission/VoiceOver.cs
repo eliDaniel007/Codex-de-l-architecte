@@ -50,10 +50,29 @@ public class VoiceOver : MonoBehaviour
 
     void Start()
     {
+        StartCoroutine(DemarrageDiffere());
+    }
+
+    IEnumerator DemarrageDiffere()
+    {
+        yield return null; // laisse l'écran titre lever son drapeau Visible
+        if (EcranTitre.Visible) yield break; // la cinématique lancera l'ouverture
+        AnnoncerOuvertureInterne();
+    }
+
+    /// <summary>Réplique d'ouverture : intro si briefing à faire, sinon mission en cours.
+    /// Appelée par la cinématique de briefing (après l'écran titre).</summary>
+    public static void AnnoncerOuverture()
+    {
+        if (Instance != null) Instance.AnnoncerOuvertureInterne();
+    }
+
+    void AnnoncerOuvertureInterne()
+    {
         if (GameState.I.BriefingEnAttente())
-            JouerNomme("intro", 1.2f);     // « rends-toi au CPU pour tes objectifs »
+            JouerNomme("intro", 1.0f);     // « rends-toi au CPU pour tes objectifs »
         else
-            Annoncer(1.2f);                // reprend l'annonce de la mission en cours
+            Annoncer(1.0f);                // reprend l'annonce de la mission en cours
     }
 
     void Annoncer(float delai)
@@ -85,6 +104,8 @@ public class VoiceOver : MonoBehaviour
 
     IEnumerator JouerRadio(AudioClip voix, float delai)
     {
+        // Pas de radio tant que l'écran titre est affiché.
+        yield return new WaitUntil(() => !EcranTitre.Visible);
         yield return new WaitForSeconds(delai);
 
         _src.Stop();

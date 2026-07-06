@@ -22,6 +22,7 @@ public static class Badges
         ("programme_fini", "Programme exécuté",    "Terminer toutes les lignes du programme."),
         ("perfection",     "Compilation parfaite", "Campagne entière avec zéro erreur."),
         ("logicien",       "Logicien",             "Exécuter ta première condition if."),
+        ("boucleur",       "Boucleur",             "Exécuter ta première boucle for jusqu'au bout."),
         ("chasseur_bug",   "Chasseur de bugs",     "Trouver l'insecte caché sur la carte mère."),
     };
 
@@ -85,6 +86,11 @@ public static class Badges
     public static void Logicien() =>
         Debloquer("logicien", "Logicien",
                   "Le CPU a évalué ta première condition if. VRAI ou FAUX, telle est la question.");
+
+    /// <summary>Première boucle for exécutée jusqu'au test FAUX (ligne 8).</summary>
+    public static void Boucleur() =>
+        Debloquer("boucleur", "Boucleur",
+                  "0, 1, 2... et FAUX : ta première boucle for est allée au bout.");
 
     /// <summary>Le joueur a trouvé l'insecte caché (clin d'œil à Grace Hopper).</summary>
     public static void ChasseurDeBug() =>

@@ -23,7 +23,8 @@ public enum QuestKind
     DeclarationRam, // validée en déclarant une variable directement dans la RAM (formulaire)
     SaisieEcran,  // Console.ReadLine() sur l'écran : taper une valeur puis ranger la box en RAM
     Parse,        // z = Int32.Parse(y) : apporter y au CPU, ranger z en RAM
-    ConditionIf   // if (somme > seuil) : apporter somme au CPU, afficher le message de la branche
+    ConditionIf,  // if (somme > seuil) : apporter somme au CPU, afficher le message de la branche
+    Boucle        // for (i = 0; i < 3; i++) : le CPU donne i à chaque tour, ranger en RAM
 }
 
 /// <summary>
@@ -226,6 +227,7 @@ public class GameState : MonoBehaviour
         MissionHUD.Ensure();
         ObjectiveMarker.Ensure();
         VoiceOver.Ensure();
+        EcranTitre.Ensure();      // écran titre au lancement (avant le briefing)
         BriefingCinematic.Ensure();
         PauseMenu.Ensure();
         NotificationsUI.Ensure(); // toasts (badges, rating de mission)
@@ -295,6 +297,13 @@ public class GameState : MonoBehaviour
             "// si somme > 50 : affiche \"grand\" — sinon : affiche \"petit\"",
             QuestKind.ConditionIf,
             "Prends une copie de somme dans la RAM et apporte-la au CPU."));
+
+        // ── CHAPITRE 3 : la boucle ──
+        quests.Add(new Quest(
+            "8.  for (int i = 0; i < 3; i++)",
+            "// à chaque tour : range i dans la RAM (0, puis 1, puis 2) — même adresse !",
+            QuestKind.Boucle,
+            "Va au CPU : il lance la boucle et te donne la boîte i."));
     }
 
     // ── Étapes internes de la mission active ─────────────────────────────
@@ -352,6 +361,12 @@ public class GameState : MonoBehaviour
                 return missionEtape == 0
                     ? "Prends une copie de somme dans la RAM et apporte-la au CPU."
                     : "Pose la boîte message sur l'écran (le résultat du if).";
+            case QuestKind.Boucle:
+                if (boxExists && boxVariable == "i")
+                    return $"Range la boîte i = {boxValue} dans la RAM (tour {missionEtape + 1}/3).";
+                return missionEtape < 3
+                    ? $"Va au CPU : itération i = {missionEtape} (tour {missionEtape + 1}/3)."
+                    : "Retourne au CPU pour le test final : i < 3 ?";
             default:
                 return q.indication;
         }
@@ -541,6 +556,34 @@ public class GameState : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// Ligne 8 : for (int i = 0; i &lt; 3; i++) — chaque visite au CPU exécute un
+    /// tour de boucle : test du i courant, puis il te donne la boîte i à ranger.
+    /// missionEtape = valeur courante de i (0..3). Retourne le message du CPU.
+    /// </summary>
+    public string BoucleCpu()
+    {
+        var q = QueteActuelle();
+        if (q == null || q.complete || q.kind != QuestKind.Boucle) return null;
+
+        if (boxExists)
+            return $"Range d'abord la boîte i = {boxValue} dans la RAM (le tour n'est pas fini).";
+
+        if (missionEtape < 3)
+        {
+            // Test VRAI → le CPU exécute le corps du tour : il te donne i.
+            EnregistrerBox("i", missionEtape.ToString(), "int", CouleurType("int"));
+            spawnDansLaMain = true;
+            AudioFX.Succes(); MajIndication(); Sauvegarder();
+            return $"for :  i = {missionEtape} ;  i < 3 → VRAI.  " +
+                   $"Range la boîte i dans la RAM (elle écrase l'ancienne valeur !).";
+        }
+
+        // i = 3 : le test échoue → la boucle se termine, la ligne est exécutée.
+        CompleterQueteActuelle();
+        return "for :  i = 3 ;  i < 3 → FAUX.  La boucle s'arrête : ligne terminée !";
+    }
+
     void ConsommerBoxEnMain()
     {
         boxExists       = false;
@@ -572,6 +615,7 @@ public class GameState : MonoBehaviour
         AnnoncerRatingMission(q, dureeMission, erreursMission);
         Badges.MissionTerminee(dureeMission, erreursMission);
         if (q.kind == QuestKind.ConditionIf) Badges.Logicien();
+        if (q.kind == QuestKind.Boucle)      Badges.Boucleur();
 
         if (questIndex < quests.Count - 1) questIndex++;
         missionEtape = 0; // chaque mission repart à son étape 0
@@ -931,6 +975,13 @@ public class GameState : MonoBehaviour
             if      (q.kind == QuestKind.SaisieEcran && missionEtape == 2 && nomDepose == "y")     CompleterQueteActuelle();
             else if (q.kind == QuestKind.Parse       && missionEtape == 1 && nomDepose == "z")     CompleterQueteActuelle();
             else if (q.kind == QuestKind.Calcul      && missionEtape == 2 && nomDepose == "somme") CompleterQueteActuelle();
+            else if (q.kind == QuestKind.Boucle      && nomDepose == "i")
+            {
+                // Tour de boucle accompli : i++ (retourne au CPU pour le test suivant).
+                missionEtape++;
+                AudioFX.Succes();
+                MajIndication();
+            }
             else if (q.kind == QuestKind.Rangement) CompleterQueteActuelle(); // legacy
         }
         Sauvegarder();

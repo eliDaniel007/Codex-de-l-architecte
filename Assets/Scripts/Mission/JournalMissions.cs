@@ -46,7 +46,7 @@ public class JournalMissions : MonoBehaviour
     {
         // Uniquement dans la MainScene, hors pause / cinématique / rating.
         if (SceneManager.GetActiveScene().name != GameState.I.mainSceneName) return;
-        if (BriefingCinematic.EnCours || RatingScreen.Visible) return;
+        if (EcranTitre.Visible || BriefingCinematic.EnCours || RatingScreen.Visible) return;
 
 #if ENABLE_INPUT_SYSTEM
         bool j = Keyboard.current != null && Keyboard.current.jKey.wasPressedThisFrame;

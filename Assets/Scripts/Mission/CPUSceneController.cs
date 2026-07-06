@@ -29,8 +29,8 @@ public class CPUSceneController : MonoBehaviour
         // Briefing : la visite au CPU révèle la mission active.
         GameState.I.RevelerMissionActuelle();
 
-        // Si le joueur porte une box inattendue, le CPU peut lui donner un indice.
-        _calcMessage = GameState.I.CpuRecevoir();
+        // Box portée traitée (Parse, somme, if) — sinon tour de boucle (ligne 8).
+        _calcMessage = GameState.I.CpuRecevoir() ?? GameState.I.BoucleCpu();
 
         ConstruireUI();
     }

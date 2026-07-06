@@ -51,8 +51,8 @@ public class CPUZone : MonoBehaviour
 
     void Update()
     {
-        // Pas de changement de scène pendant la cinématique de briefing.
-        if (BriefingCinematic.EnCours) return;
+        // Pas de changement de scène pendant l'écran titre ou la cinématique.
+        if (EcranTitre.Visible || BriefingCinematic.EnCours) return;
 
         if (_player == null) { TrouverJoueur(); if (_player == null) return; }
 

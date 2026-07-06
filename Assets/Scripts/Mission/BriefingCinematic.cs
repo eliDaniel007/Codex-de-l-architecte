@@ -77,10 +77,20 @@ public class BriefingCinematic : MonoBehaviour
         }
 
         if (_dejaJouee) return;
+        if (EcranTitre.Visible) return; // le titre d'abord : il nous lancera à sa fermeture
 
         // Automatique à chaque lancement du jeu (une fois par session).
         _dejaJouee = true;
         StartCoroutine(Jouer());
+    }
+
+    /// <summary>Lance la cinématique après la fermeture de l'écran titre.</summary>
+    public static void LancerApresTitre()
+    {
+        if (Instance == null || _dejaJouee) return;
+        if (SceneManager.GetActiveScene().name != GameState.I.mainSceneName) return;
+        _dejaJouee = true;
+        Instance.StartCoroutine(Instance.Jouer());
     }
 
     /// <summary>Arrête la cinématique et nettoie (changement de scène inattendu).</summary>
@@ -91,6 +101,7 @@ public class BriefingCinematic : MonoBehaviour
         _overlay = null;
         _cam     = null;
         _geles.Clear(); // les composants gelés appartenaient à la scène détruite
+        MusiqueOuverture.ArreterEnFondu(1f);
         EnCours  = false;
     }
 
@@ -104,9 +115,34 @@ public class BriefingCinematic : MonoBehaviour
 #endif
     }
 
+    /// <summary>Le clavier « principal » : le plus éloigné du portail RAM.</summary>
+    static Transform TrouverClavierPrincipal()
+    {
+        var claviers = FindObjectsByType<KeyboardTerminal>(FindObjectsSortMode.None);
+        if (claviers.Length == 0) return null;
+
+        var ram = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
+        if (ram == null) return claviers[0].transform;
+
+        Transform meilleur = claviers[0].transform;
+        float best = -1f;
+        foreach (var k in claviers)
+        {
+            float d = Vector3.Distance(k.transform.position, ram.transform.position);
+            if (d > best) { best = d; meilleur = k.transform; }
+        }
+        return meilleur;
+    }
+
     IEnumerator Jouer()
     {
         EnCours = true;
+
+        // Bande-son : la musique d'ouverture continue (ou démarre), et la radio
+        // lance son briefing PENDANT le survol.
+        MusiqueOuverture.Jouer();
+        VoiceOver.AnnoncerOuverture();
+
         yield return null; // laisse la scène s'initialiser
 
         var mainCam = Camera.main;
@@ -122,11 +158,13 @@ public class BriefingCinematic : MonoBehaviour
         // Étapes du survol : (nom affiché, cible)
         var etapes = new System.Collections.Generic.List<(string nom, Transform cible)>();
         var cpu     = GameObject.Find("Processeur");
+        var clavier = TrouverClavierPrincipal();
         var portail = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
         var ecran   = FindFirstObjectByType<ConsoleScreen>();
-        if (cpu     != null) etapes.Add(("CPU — lit le programme et calcule",          cpu.transform));
-        if (portail != null) etapes.Add(("RAM — déclare et range tes variables",       portail.transform));
-        if (ecran   != null) etapes.Add(("ÉCRAN — Console : affichage et saisie",      ecran.transform));
+        if (cpu     != null) etapes.Add(("CPU — lit le programme et calcule",     cpu.transform));
+        if (clavier != null) etapes.Add(("CLAVIER — le terminal de saisie",       clavier));
+        if (portail != null) etapes.Add(("RAM — déclare et range tes variables",  portail.transform));
+        if (ecran   != null) etapes.Add(("ÉCRAN — Console : affichage et saisie", ecran.transform));
         if (etapes.Count == 0) yield break;
 
         // Caméra de cinématique (au-dessus de la caméra joueur).
@@ -188,6 +226,7 @@ public class BriefingCinematic : MonoBehaviour
         if (_overlay != null) Destroy(_overlay);
         _cam = null;
         GelerJoueur(null, false); // rend les commandes au joueur
+        MusiqueOuverture.ArreterEnFondu(2.5f); // la musique s'éteint, place au jeu
         EnCours = false;
     }
 

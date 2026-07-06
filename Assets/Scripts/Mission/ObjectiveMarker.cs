@@ -124,6 +124,11 @@ public class ObjectiveMarker : MonoBehaviour
                     if (gs.missionEtape == 0) _cible = gs.boxExists ? TourCpu() : PortailRam();
                     else                      _cible = Ecran();
                     break;
+
+                // 8. for : boîte i en main → RAM (la ranger) ; sinon → CPU (tour suivant).
+                case QuestKind.Boucle:
+                    _cible = gs.boxExists ? PortailRam() : TourCpu();
+                    break;
             }
         }
 
