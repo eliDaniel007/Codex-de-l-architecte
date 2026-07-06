@@ -22,7 +22,8 @@ public enum QuestKind
     Calcul,       // somme = x + z : apporter x puis z au CPU, ranger somme en RAM
     DeclarationRam, // validée en déclarant une variable directement dans la RAM (formulaire)
     SaisieEcran,  // Console.ReadLine() sur l'écran : taper une valeur puis ranger la box en RAM
-    Parse         // z = Int32.Parse(y) : apporter y au CPU, ranger z en RAM
+    Parse,        // z = Int32.Parse(y) : apporter y au CPU, ranger z en RAM
+    ConditionIf   // if (somme > seuil) : apporter somme au CPU, afficher le message de la branche
 }
 
 /// <summary>
@@ -193,6 +194,17 @@ public class GameState : MonoBehaviour
         Sauvegarder();
     }
 
+    [Header("Accessibilité")]
+    [Tooltip("Mode Zen : le rating ignore le chrono (aucune pression de temps).")]
+    public bool modeZen;
+
+    public void BasculerModeZen()
+    {
+        modeZen = !modeZen;
+        PlayerPrefs.SetInt("cda_zen", modeZen ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
     [Header("Flux scènes")]
 [Tooltip("Au prochain chargement de MainScene, fait apparaître un cube physique.")]
     public bool   needsSpawn;
@@ -210,6 +222,7 @@ public class GameState : MonoBehaviour
         _sessionDebut = Time.realtimeSinceStartup;
         InitQuests();
         Charger(); // restaure la progression sauvegardée (le cas échéant)
+        modeZen = PlayerPrefs.GetInt("cda_zen", 0) == 1; // réglage indépendant de la campagne
         MissionHUD.Ensure();
         ObjectiveMarker.Ensure();
         VoiceOver.Ensure();
@@ -275,17 +288,29 @@ public class GameState : MonoBehaviour
             "// affiche la somme",
             QuestKind.LectureRam,
             "Prends une copie de somme dans la RAM et pose-la sur l'écran.") { cibleVariable = "somme" });
+
+        // ── CHAPITRE 2 : la condition ──
+        quests.Add(new Quest(
+            "7.  if (somme > 50) ... else ...",
+            "// si somme > 50 : affiche \"grand\" — sinon : affiche \"petit\"",
+            QuestKind.ConditionIf,
+            "Prends une copie de somme dans la RAM et apporte-la au CPU."));
     }
 
     // ── Étapes internes de la mission active ─────────────────────────────
     // SaisieEcran : 0 = déclarer string y en RAM, 1 = ReadLine à l'écran, 2 = ranger y en RAM.
     // Parse       : 0 = apporter y au CPU,        1 = ranger z en RAM.
     // Calcul      : 0 = apporter x, 1 = apporter z, 2 = ranger somme en RAM.
+    // ConditionIf : 0 = apporter somme au CPU,    1 = afficher le message à l'écran.
     [System.NonSerialized] public int missionEtape;
+
+    /// <summary>Seuil du if de la ligne 7 : if (somme > SEUIL_IF).</summary>
+    public const long SEUIL_IF = 50;
 
     // Valeurs mémorisées par le CPU (affichage de la scène Calculateur).
     [System.NonSerialized] public long   cpuX, cpuZ, cpuSomme;
     [System.NonSerialized] public string cpuY = "";
+    [System.NonSerialized] public string cpuVerdict = ""; // "grand" / "petit" (ligne 7)
 
     /// <summary>Couleur standard d'un type (utilisée sur les boîtes et les textes RAM).</summary>
     public static Color CouleurType(string type)
@@ -323,6 +348,10 @@ public class GameState : MonoBehaviour
                 if (missionEtape == 0) return "Prends x dans la RAM et apporte-le au CPU.";
                 if (missionEtape == 1) return "Prends z dans la RAM et apporte-le au CPU.";
                 return "Range la boîte somme dans la RAM.";
+            case QuestKind.ConditionIf:
+                return missionEtape == 0
+                    ? "Prends une copie de somme dans la RAM et apporte-la au CPU."
+                    : "Pose la boîte message sur l'écran (le résultat du if).";
             default:
                 return q.indication;
         }
@@ -490,6 +519,25 @@ public class GameState : MonoBehaviour
             return missionEtape == 0 ? "Le CPU attend la boîte x (prends-la dans la RAM)."
                                      : "Le CPU attend la boîte z (prends-la dans la RAM).";
         }
+
+        // Ligne 7 : if (somme > SEUIL) → le CPU teste et donne le message de la branche
+        if (q.kind == QuestKind.ConditionIf)
+        {
+            if (missionEtape == 0 && boxVariable == "somme")
+            {
+                long.TryParse(boxValue, out cpuSomme);
+                bool vrai  = cpuSomme > SEUIL_IF;
+                cpuVerdict = vrai ? "grand" : "petit";
+                ConsommerBoxEnMain();
+                EnregistrerBox("message", cpuVerdict, "string", CouleurType("string"));
+                spawnDansLaMain = true; // le CPU te rend le message en main
+                missionEtape = 1;
+                AudioFX.MissionValidee(); MajIndication(); Sauvegarder();
+                return $"if ({cpuSomme} > {SEUIL_IF}) → {(vrai ? "VRAI" : "FAUX")}.  " +
+                       $"La branche exécutée donne \"{cpuVerdict}\" : affiche ce message sur l'écran.";
+            }
+            return "Le CPU attend la boîte somme (prends une copie dans la RAM).";
+        }
         return null;
     }
 
@@ -523,6 +571,7 @@ public class GameState : MonoBehaviour
         int   erreursMission = nbErreurs - _missionErreursDebut;
         AnnoncerRatingMission(q, dureeMission, erreursMission);
         Badges.MissionTerminee(dureeMission, erreursMission);
+        if (q.kind == QuestKind.ConditionIf) Badges.Logicien();
 
         if (questIndex < quests.Count - 1) questIndex++;
         missionEtape = 0; // chaque mission repart à son étape 0
@@ -554,16 +603,51 @@ public class GameState : MonoBehaviour
 
     void AnnoncerRatingMission(Quest q, float duree, int erreurs)
     {
-        int etoiles = (erreurs == 0 && duree < 90f) ? 3
-                    : (erreurs <= 1)                ? 2
-                    :                                 1;
+        // Mode Zen : le temps ne compte pas, seule la justesse est notée.
+        int etoiles = modeZen
+            ? (erreurs == 0 ? 3 : erreurs <= 1 ? 2 : 1)
+            : (erreurs == 0 && duree < 90f) ? 3
+            : (erreurs <= 1)                ? 2
+            :                                 1;
         string titreNote = etoiles == 3 ? "Architecte Élégant"
                          : etoiles == 2 ? "Exécution Solide"
                          :                "En Rodage";
+        string detail = modeZen
+            ? $"{titreNote} — {erreurs} erreur{(erreurs > 1 ? "s" : "")} (mode Zen)"
+            : $"{titreNote} — {duree:0} s, {erreurs} erreur{(erreurs > 1 ? "s" : "")}";
         NotificationsUI.Afficher(
             $"LIGNE TERMINÉE   <color=#FFD24F>{etoiles}/3</color>",
-            $"{titreNote} — {duree:0} s, {erreurs} erreur{(erreurs > 1 ? "s" : "")}",
+            detail,
             new Color(0f, 1f, 0.55f));
+
+        EnregistrerStatLigne(questIndex, etoiles, duree, erreurs);
+    }
+
+    /// <summary>Garde le MEILLEUR résultat de chaque ligne (étoiles, puis temps).</summary>
+    void EnregistrerStatLigne(int index, int etoiles, float duree, int erreurs)
+    {
+        string cle = "cda_stat_" + index;
+        var ancien = PlayerPrefs.GetString(cle, "").Split('|');
+        if (ancien.Length == 3 &&
+            int.TryParse(ancien[0], out int etOld) && float.TryParse(ancien[1], out float durOld))
+        {
+            // On ne remplace que si c'est mieux (plus d'étoiles, ou aussi bien mais plus vite).
+            if (etOld > etoiles || (etOld == etoiles && durOld <= duree)) return;
+        }
+        PlayerPrefs.SetString(cle, $"{etoiles}|{duree:0.#}|{erreurs}");
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>Meilleur résultat d'une ligne : (étoiles, durée, erreurs) ou null.</summary>
+    public (int etoiles, float duree, int erreurs)? StatLigne(int index)
+    {
+        var p = PlayerPrefs.GetString("cda_stat_" + index, "").Split('|');
+        if (p.Length == 3 &&
+            int.TryParse(p[0], out int et) &&
+            float.TryParse(p[1], out float du) &&
+            int.TryParse(p[2], out int er))
+            return (et, du, er);
+        return null;
     }
 
     /// <summary>
@@ -699,6 +783,10 @@ public class GameState : MonoBehaviour
                 quests[i].compteur = PlayerPrefs.GetInt("cda_compteur", 0);
         }
 
+        // Le programme s'est allongé depuis la sauvegarde (ex : ligne 7 ajoutée) :
+        // si la quête courante est déjà terminée, on avance à la première non faite.
+        while (questIndex < quests.Count - 1 && quests[questIndex].complete) questIndex++;
+
         // Étape de la mission active + valeurs mémorisées par le CPU
         missionEtape = PlayerPrefs.GetInt("cda_etape", 0);
         var calc = PlayerPrefs.GetString("cda_calc", "").Split('|');
@@ -743,6 +831,7 @@ public class GameState : MonoBehaviour
                                   "cda_saisie", "cda_completes", "cda_compteur", "cda_ram",
                                   "cda_calcStep", "cda_calc", "cda_revelee", "cda_etape", "cda_version" })
             PlayerPrefs.DeleteKey(k);
+        for (int i = 0; i < 10; i++) PlayerPrefs.DeleteKey("cda_stat_" + i); // stats par ligne
         PlayerPrefs.Save();
     }
 
@@ -1008,9 +1097,73 @@ public class GameState : MonoBehaviour
         pi.heldScaleFactor = 1f; // déjà à la bonne échelle
 
         AjouterLabelBoite(box.transform);
+        AjouterParticulesBoite(box.transform, boxColor); // étincelles à la couleur du type
 
         Debug.Log($"[GameState] Boîte respawnée à {pos} : {boxType} {boxVariable} = {boxValue}");
         return box;
+    }
+
+    // ── particules colorées de la boîte portée ────────────────────────────
+
+    static Texture2D _texEtincelle;
+
+    /// <summary>Douces étincelles autour de la boîte, à la couleur de son type.</summary>
+    void AjouterParticulesBoite(Transform box, Color c)
+    {
+        var go = new GameObject("ParticulesType");
+        go.transform.SetParent(box, false);
+        go.transform.localPosition = Vector3.zero;
+
+        var ps   = go.AddComponent<ParticleSystem>();
+        var main = ps.main;
+        main.startLifetime   = new ParticleSystem.MinMaxCurve(0.8f, 1.5f);
+        main.startSpeed      = new ParticleSystem.MinMaxCurve(0.05f, 0.25f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(0.05f, 0.13f);
+        main.startColor      = new Color(c.r, c.g, c.b, 0.9f);
+        main.gravityModifier = -0.05f; // les étincelles montent doucement
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles    = 40;
+
+        var emission = ps.emission;
+        emission.rateOverTime = 9f;
+
+        var forme = ps.shape;
+        forme.shapeType = ParticleSystemShapeType.Sphere;
+        forme.radius    = 0.5f;
+
+        var col = ps.colorOverLifetime;
+        col.enabled = true;
+        var grad = new Gradient();
+        grad.SetKeys(
+            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.25f),
+                    new GradientAlphaKey(1f, 0.7f), new GradientAlphaKey(0f, 1f) });
+        col.color = grad;
+
+        var rend = go.GetComponent<ParticleSystemRenderer>();
+        var sh   = Shader.Find("Legacy Shaders/Particles/Additive") ?? Shader.Find("Sprites/Default");
+        var mat  = new Material(sh);
+        if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
+        mat.mainTexture = TexEtincelle();
+        rend.material = mat;
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+
+    static Texture2D TexEtincelle()
+    {
+        if (_texEtincelle != null) return _texEtincelle;
+        const int S = 32;
+        _texEtincelle = new Texture2D(S, S, TextureFormat.RGBA32, false);
+        _texEtincelle.wrapMode = TextureWrapMode.Clamp;
+        for (int y = 0; y < S; y++)
+        for (int x = 0; x < S; x++)
+        {
+            float dx = (x - S / 2f) / (S / 2f), dy = (y - S / 2f) / (S / 2f);
+            float a = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy));
+            _texEtincelle.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+        }
+        _texEtincelle.Apply();
+        return _texEtincelle;
     }
 
     /// <summary>Teinte le carton de la boîte avec la couleur EXACTE donnée (sans toucher aux textes).</summary>

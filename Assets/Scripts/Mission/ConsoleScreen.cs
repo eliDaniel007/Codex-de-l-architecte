@@ -92,6 +92,12 @@ public class ConsoleScreen : MonoBehaviour
                     PromptUI.Show($"L'écran attend <color=#00D9FF>{q.cibleVariable}</color> repris depuis la RAM. (Ta boîte n'est pas détruite.)");
                 }
             }
+            else if (q != null && !q.complete && q.kind == QuestKind.ConditionIf &&
+                     gs.missionEtape == 1 && db.variableName == "message")
+            {
+                // Ligne 7 : le message de la branche du if s'affiche → programme terminé.
+                AfficherEtConsommer(held, db, valider: true);
+            }
             else if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 2)
             {
                 PromptUI.Show("Cette boîte va dans la <color=#00D9FF>RAM</color>, pas sur l'écran. Range y en mémoire !");

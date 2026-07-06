@@ -19,6 +19,7 @@ public class PauseMenu : MonoBehaviour
     private Canvas     _canvas;
     private GameObject _bouton;     // petit bouton ☰
     private GameObject _overlay;    // menu pause (caché par défaut)
+    private TextMeshProUGUI _btnZen; // libellé du bouton Mode Zen
     private bool       _enPause;
     private readonly List<MonoBehaviour> _gelees = new List<MonoBehaviour>();
 
@@ -111,6 +112,16 @@ public class PauseMenu : MonoBehaviour
         GameState.I.ReinitialiserCampagne();
     }
 
+    string LibelleZen() =>
+        GameState.I.modeZen ? "MODE ZEN : <color=#59C96A>ACTIVÉ</color>"
+                            : "MODE ZEN : <color=#7A8699>DÉSACTIVÉ</color>";
+
+    void BasculerZen()
+    {
+        GameState.I.BasculerModeZen();
+        if (_btnZen != null) _btnZen.text = LibelleZen();
+    }
+
     void Quitter()
     {
         Time.timeScale = 1f;
@@ -185,30 +196,37 @@ public class PauseMenu : MonoBehaviour
         AjouterTitre(_overlay.transform, "PAUSE",
             new Vector2(0.2f, 0.66f), new Vector2(0.8f, 0.8f), 80f);
 
-        Bouton(_overlay.transform, "REPRENDRE",   new Vector2(0.38f, 0.52f), new Vector2(0.62f, 0.60f),
+        Bouton(_overlay.transform, "REPRENDRE",   new Vector2(0.38f, 0.54f), new Vector2(0.62f, 0.62f),
             new Color(0.1f, 0.35f, 0.18f), Reprendre);
-        Bouton(_overlay.transform, "RECOMMENCER", new Vector2(0.38f, 0.42f), new Vector2(0.62f, 0.50f),
+        Bouton(_overlay.transform, "RECOMMENCER", new Vector2(0.38f, 0.44f), new Vector2(0.62f, 0.52f),
             new Color(0.30f, 0.22f, 0.08f), Recommencer);
-        Bouton(_overlay.transform, "QUITTER",     new Vector2(0.38f, 0.32f), new Vector2(0.62f, 0.40f),
+
+        // Mode Zen : le rating ignore le chrono (accessibilité / anti-stress).
+        _btnZen = Bouton(_overlay.transform, LibelleZen(), new Vector2(0.38f, 0.34f), new Vector2(0.62f, 0.42f),
+            new Color(0.10f, 0.24f, 0.38f), BasculerZen);
+
+        Bouton(_overlay.transform, "QUITTER",     new Vector2(0.38f, 0.24f), new Vector2(0.62f, 0.32f),
             new Color(0.35f, 0.12f, 0.12f), Quitter);
 
-        AjouterTitre(_overlay.transform, "<size=60%>[Échap] pour reprendre</size>",
-            new Vector2(0.2f, 0.22f), new Vector2(0.8f, 0.28f), 28f);
+        AjouterTitre(_overlay.transform, "<size=60%>[Échap] pour reprendre — Mode Zen : la note ignore le chrono</size>",
+            new Vector2(0.15f, 0.15f), new Vector2(0.85f, 0.21f), 28f);
 
         _overlay.SetActive(false);
     }
 
-    void AjouterLabel(Transform parent, string texte, float taille, Color couleur)
+    TextMeshProUGUI AjouterLabel(Transform parent, string texte, float taille, Color couleur)
     {
         var go = new GameObject("Label");
         go.transform.SetParent(parent, false);
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text = texte; tmp.fontSize = taille; tmp.color = couleur;
         tmp.alignment = TextAlignmentOptions.Center; tmp.fontStyle = FontStyles.Bold;
+        tmp.richText = true;
         tmp.raycastTarget = false;
         var r = go.GetComponent<RectTransform>();
         r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one;
         r.offsetMin = r.offsetMax = Vector2.zero;
+        return tmp;
     }
 
     void AjouterTitre(Transform parent, string texte, Vector2 ancMin, Vector2 ancMax, float taille)
@@ -224,7 +242,7 @@ public class PauseMenu : MonoBehaviour
         r.offsetMin = r.offsetMax = Vector2.zero;
     }
 
-    void Bouton(Transform parent, string label, Vector2 ancMin, Vector2 ancMax, Color couleur, System.Action onClick)
+    TextMeshProUGUI Bouton(Transform parent, string label, Vector2 ancMin, Vector2 ancMax, Color couleur, System.Action onClick)
     {
         var go = new GameObject("Btn_" + label);
         go.transform.SetParent(parent, false);
@@ -233,7 +251,7 @@ public class PauseMenu : MonoBehaviour
         var r = go.GetComponent<RectTransform>();
         r.anchorMin = ancMin; r.anchorMax = ancMax;
         r.offsetMin = r.offsetMax = Vector2.zero;
-        AjouterLabel(go.transform, label, 28f, Color.white);
+        return AjouterLabel(go.transform, label, 28f, Color.white);
     }
 
     static void EnsureEventSystem()

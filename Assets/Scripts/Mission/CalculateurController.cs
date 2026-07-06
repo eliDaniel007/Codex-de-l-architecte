@@ -97,6 +97,15 @@ public class CalculateurController : MonoBehaviour
                 ? $"{xStr}\n{zStr}\n\n<color=#FFD27F>somme = x + z = {gs.cpuX} + {gs.cpuZ} = {gs.cpuSomme}</color>"
                 : $"{xStr}\n{zStr}";
         }
+        else if (q != null && q.kind == QuestKind.ConditionIf)
+        {
+            // if (somme > 50) → branche exécutée
+            bool vrai = gs.cpuSomme > GameState.SEUIL_IF;
+            op = $"somme = <color=#00D9FF>{gs.cpuSomme}</color>\n\n" +
+                 $"if (somme > {GameState.SEUIL_IF})  →  " +
+                 (vrai ? "<color=#59C96A>VRAI</color>" : "<color=#FF6B6B>FAUX</color>") + "\n\n" +
+                 $"<color=#FFD27F>Console.WriteLine(\"{gs.cpuVerdict}\")</color>";
+        }
 
         Txt(op, new Vector2(0.1f, 0.42f), new Vector2(0.9f, 0.78f), 60f, Color.white, FontStyles.Bold, canvasGO.transform);
 

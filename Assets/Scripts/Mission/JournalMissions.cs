@@ -85,14 +85,25 @@ public class JournalMissions : MonoBehaviour
     {
         var gs = GameState.I;
 
-        // Colonne missions
+        // Colonne missions (+ meilleur score de chaque ligne terminée)
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("<size=130%><color=#00D9FF>LE PROGRAMME</color></size>\n");
+        int mn = Mathf.FloorToInt(gs.TempsCampagne / 60f);
+        int sec = Mathf.FloorToInt(gs.TempsCampagne % 60f);
+        sb.AppendLine($"<size=130%><color=#00D9FF>LE PROGRAMME</color></size>  " +
+                      $"<size=75%><color=#7A8699>{mn:0}:{sec:00} — {gs.nbErreurs} erreur{(gs.nbErreurs > 1 ? "s" : "")}" +
+                      $"{(gs.modeZen ? " — mode Zen" : "")}</color></size>\n");
         for (int i = 0; i < gs.quests.Count; i++)
         {
             var q = gs.quests[i];
             if (q.complete)
-                sb.AppendLine($"<color=#59C96A>[OK]</color>  <color=#AEB9CC>{q.titre}</color>");
+            {
+                sb.Append($"<color=#59C96A>[OK]</color>  <color=#AEB9CC>{q.titre}</color>");
+                var stat = gs.StatLigne(i);
+                if (stat.HasValue)
+                    sb.Append($"   <size=75%><color=#FFD24F>{stat.Value.etoiles}/3</color>" +
+                              $"<color=#7A8699> — {stat.Value.duree:0} s, {stat.Value.erreurs} err.</color></size>");
+                sb.AppendLine();
+            }
             else if (i == gs.questIndex && i <= gs.missionRevelee)
                 sb.AppendLine($"<color=#00D9FF>></color>  <b>{q.titre}</b>\n      <size=80%><color=#6BBF59><i>{q.description}</i></color></size>");
             else

@@ -19,8 +19,9 @@ public static class Badges
         ("memoire_pleine", "Mémoire bien remplie", "Quatre variables en RAM en même temps."),
         ("zero_erreur",    "Sans faute",           "Une ligne exécutée sans aucune erreur."),
         ("eclair",         "Exécution éclair",     "Une ligne terminée en moins de 60 secondes."),
-        ("programme_fini", "Programme exécuté",    "Terminer les 6 lignes du programme."),
+        ("programme_fini", "Programme exécuté",    "Terminer toutes les lignes du programme."),
         ("perfection",     "Compilation parfaite", "Campagne entière avec zéro erreur."),
+        ("logicien",       "Logicien",             "Exécuter ta première condition if."),
         ("chasseur_bug",   "Chasseur de bugs",     "Trouver l'insecte caché sur la carte mère."),
     };
 
@@ -74,11 +75,16 @@ public static class Badges
     public static void CampagneTerminee(int erreursTotales)
     {
         Debloquer("programme_fini", "Programme exécuté",
-                  "Les 6 lignes du programme sont terminées. Bravo, architecte !");
+                  "Toutes les lignes du programme sont terminées. Bravo, architecte !");
         if (erreursTotales == 0)
             Debloquer("perfection", "Compilation parfaite",
                       "Campagne entière terminée avec zéro erreur. Respect.");
     }
+
+    /// <summary>Première condition if exécutée (ligne 7).</summary>
+    public static void Logicien() =>
+        Debloquer("logicien", "Logicien",
+                  "Le CPU a évalué ta première condition if. VRAI ou FAUX, telle est la question.");
 
     /// <summary>Le joueur a trouvé l'insecte caché (clin d'œil à Grace Hopper).</summary>
     public static void ChasseurDeBug() =>

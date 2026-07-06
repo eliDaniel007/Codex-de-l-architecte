@@ -75,11 +75,20 @@ public class MiniCarte : MonoBehaviour
         var ecran = FindFirstObjectByType<ConsoleScreen>();
         if (ecran != null) _ecran = ecran.transform;
 
-        // Claviers : un point jaune par terminal
+        // Claviers : un point jaune par terminal — SAUF celui collé à la RAM
+        // (redondant sur la carte : le violet RAM est déjà là).
         foreach (var (ui, _) in _claviers) if (ui != null) Destroy(ui.gameObject);
         _claviers.Clear();
         foreach (var k in FindObjectsByType<KeyboardTerminal>(FindObjectsSortMode.None))
+        {
+            if (_ram != null)
+            {
+                Vector3 a = k.transform.position, b = _ram.position;
+                a.y = 0f; b.y = 0f;
+                if (Vector3.Distance(a, b) < 12f) continue; // trop proche de la RAM → ignoré
+            }
             _claviers.Add((Point(new Color(1f, 0.82f, 0.3f), 11f, "CLAVIER"), k.transform));
+        }
 
         // La flèche du joueur et l'objectif restent au-dessus des autres points.
         if (_objectifUI != null) _objectifUI.SetAsLastSibling();

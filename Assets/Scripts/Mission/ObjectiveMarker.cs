@@ -118,6 +118,12 @@ public class ObjectiveMarker : MonoBehaviour
                 case QuestKind.Calcul:
                     _cible = (gs.boxExists && gs.missionEtape <= 1) ? TourCpu() : PortailRam();
                     break;
+
+                // 7. if (somme > 50) : somme en main → CPU ; message en main → écran ; sinon → RAM.
+                case QuestKind.ConditionIf:
+                    if (gs.missionEtape == 0) _cible = gs.boxExists ? TourCpu() : PortailRam();
+                    else                      _cible = Ecran();
+                    break;
             }
         }
 
