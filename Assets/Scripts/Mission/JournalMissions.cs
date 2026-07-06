@@ -79,6 +79,27 @@ public class JournalMissions : MonoBehaviour
         }
     }
 
+    void ExporterRapport()
+    {
+        string chemin = RapportEleve.Exporter();
+        if (chemin != null)
+        {
+            AudioFX.Succes();
+            // Chemin raccourci pour le toast (dossier parent + nom de fichier).
+            string court = System.IO.Path.Combine(
+                System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(chemin)) ?? "",
+                System.IO.Path.GetFileName(chemin));
+            NotificationsUI.Afficher("RAPPORT EXPORTÉ",
+                $"Fichier créé : {court}", new Color(0.3f, 0.8f, 1f));
+        }
+        else
+        {
+            AudioFX.Erreur();
+            NotificationsUI.Afficher("EXPORT IMPOSSIBLE",
+                "Voir la console pour le détail.", new Color(1f, 0.45f, 0.45f));
+        }
+    }
+
     // ── contenu ───────────────────────────────────────────────────────────
 
     void Rafraichir()
@@ -149,7 +170,25 @@ public class JournalMissions : MonoBehaviour
 
         Titre(_panneau.transform, "JOURNAL DE MISSION", new Vector2(0.05f, 0.9f), new Vector2(0.95f, 0.985f), 42f);
         Titre(_panneau.transform, "<size=55%><color=#7A8699>[J] ou [Échap] pour fermer</color></size>",
-              new Vector2(0.05f, 0.015f), new Vector2(0.95f, 0.075f), 30f);
+              new Vector2(0.04f, 0.015f), new Vector2(0.5f, 0.075f), 30f);
+
+        // Bouton d'export du rapport (fichier texte pour le professeur)
+        var btnGO = new GameObject("BtnExport");
+        btnGO.transform.SetParent(_panneau.transform, false);
+        btnGO.AddComponent<Image>().color = new Color(0.08f, 0.3f, 0.42f);
+        btnGO.AddComponent<Button>().onClick.AddListener(ExporterRapport);
+        var br = btnGO.GetComponent<RectTransform>();
+        br.anchorMin = new Vector2(0.55f, 0.018f); br.anchorMax = new Vector2(0.95f, 0.078f);
+        br.offsetMin = br.offsetMax = Vector2.zero;
+        var btnTxt = new GameObject("Label");
+        btnTxt.transform.SetParent(btnGO.transform, false);
+        var tmpB = btnTxt.AddComponent<TextMeshProUGUI>();
+        tmpB.text = "EXPORTER LE RAPPORT"; tmpB.fontSize = 24f; tmpB.fontStyle = FontStyles.Bold;
+        tmpB.color = Color.white; tmpB.alignment = TextAlignmentOptions.Center;
+        tmpB.raycastTarget = false;
+        var brt = btnTxt.GetComponent<RectTransform>();
+        brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one;
+        brt.offsetMin = brt.offsetMax = Vector2.zero;
 
         _colMissions = Colonne(new Vector2(0.045f, 0.09f), new Vector2(0.52f, 0.88f));
         _colBadges   = Colonne(new Vector2(0.55f,  0.09f), new Vector2(0.955f, 0.88f));
