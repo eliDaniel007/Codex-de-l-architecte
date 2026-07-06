@@ -235,6 +235,7 @@ public class GameState : MonoBehaviour
         JournalMissions.Ensure(); // journal de mission (touche J)
         HumourOS.Ensure();        // répliques ironiques de l'OS
         MiniCarte.Ensure();       // minimap circuit imprimé (bas-droit)
+        SkinRobot.Ensure();       // teinte du robot (débloquée par badges)
         DemarrerChronoMission();  // base de temps de la 1re mission
     }
 

@@ -21,6 +21,10 @@ public class PauseMenu : MonoBehaviour
     private GameObject _overlay;    // menu pause (caché par défaut)
     private TextMeshProUGUI _btnZen; // libellé du bouton Mode Zen
     private bool       _enPause;
+
+    // Sélecteur de skins : (cadre de sélection, pastille, étiquette verrou)
+    private readonly List<(Image cadre, Image pastille, TextMeshProUGUI verrou)> _swatches
+        = new List<(Image, Image, TextMeshProUGUI)>();
     private readonly List<MonoBehaviour> _gelees = new List<MonoBehaviour>();
 
     public static void Ensure()
@@ -87,6 +91,7 @@ public class PauseMenu : MonoBehaviour
         _enPause = true;
         _overlay.SetActive(true);
         _bouton.SetActive(false);
+        MettreAJourSwatches(); // les badges ont pu débloquer de nouveaux skins
         Time.timeScale = 0f;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible   = true;
@@ -209,10 +214,76 @@ public class PauseMenu : MonoBehaviour
         Bouton(_overlay.transform, "QUITTER",     new Vector2(0.38f, 0.24f), new Vector2(0.62f, 0.32f),
             new Color(0.35f, 0.12f, 0.12f), Quitter);
 
+        // ── Skins du robot (débloqués par badges) ──
+        AjouterTitre(_overlay.transform, "<size=55%><color=#7A8699>SKIN DU ROBOT — débloqué par tes badges</color></size>",
+            new Vector2(0.2f, 0.185f), new Vector2(0.8f, 0.23f), 28f);
+        ConstruireSwatches();
+
         AjouterTitre(_overlay.transform, "<size=60%>[Échap] pour reprendre — Mode Zen : la note ignore le chrono</size>",
-            new Vector2(0.15f, 0.15f), new Vector2(0.85f, 0.21f), 28f);
+            new Vector2(0.15f, 0.055f), new Vector2(0.85f, 0.11f), 28f);
 
         _overlay.SetActive(false);
+    }
+
+    /// <summary>Rangée de pastilles de skins, centrée. Verrouillées = sombres + nb de badges requis.</summary>
+    void ConstruireSwatches()
+    {
+        _swatches.Clear();
+        int n = SkinRobot.Skins.Length;
+        float largeur = 0.052f, espace = 0.014f;
+        float x0 = 0.5f - (n * largeur + (n - 1) * espace) * 0.5f;
+
+        for (int i = 0; i < n; i++)
+        {
+            int index = i; // capture pour le clic
+            float xa = x0 + i * (largeur + espace);
+
+            // Cadre (blanc si sélectionné)
+            var cadreGO = new GameObject("Skin_" + SkinRobot.Skins[i].nom);
+            cadreGO.transform.SetParent(_overlay.transform, false);
+            var cadre = cadreGO.AddComponent<Image>();
+            var cr = cadreGO.GetComponent<RectTransform>();
+            cr.anchorMin = new Vector2(xa, 0.125f);
+            cr.anchorMax = new Vector2(xa + largeur, 0.18f);
+            cr.offsetMin = cr.offsetMax = Vector2.zero;
+            cadreGO.AddComponent<Button>().onClick.AddListener(() =>
+            {
+                if (SkinRobot.Choisir(index)) { AudioFX.Succes(); MettreAJourSwatches(); }
+                else AudioFX.Erreur();
+            });
+
+            // Pastille colorée
+            var pastGO = new GameObject("Pastille");
+            pastGO.transform.SetParent(cadreGO.transform, false);
+            var pastille = pastGO.AddComponent<Image>();
+            pastille.raycastTarget = false;
+            var pr = pastGO.GetComponent<RectTransform>();
+            pr.anchorMin = Vector2.zero; pr.anchorMax = Vector2.one;
+            pr.offsetMin = new Vector2(3f, 3f); pr.offsetMax = new Vector2(-3f, -3f);
+
+            // Étiquette verrou (badges requis)
+            var verrou = AjouterLabel(cadreGO.transform, "", 20f, Color.white);
+
+            _swatches.Add((cadre, pastille, verrou));
+        }
+        MettreAJourSwatches();
+    }
+
+    void MettreAJourSwatches()
+    {
+        int obtenus = SkinRobot.BadgesObtenus();
+        for (int i = 0; i < _swatches.Count; i++)
+        {
+            var (cadre, pastille, verrou) = _swatches[i];
+            var (_, couleur, requis) = SkinRobot.Skins[i];
+            bool debloque = obtenus >= requis;
+            bool actif    = SkinRobot.SkinActuel == i;
+
+            cadre.color    = actif ? Color.white : new Color(0.1f, 0.14f, 0.22f);
+            pastille.color = debloque ? couleur
+                                      : new Color(couleur.r * 0.22f, couleur.g * 0.22f, couleur.b * 0.22f);
+            verrou.text    = debloque ? "" : requis.ToString();
+        }
     }
 
     TextMeshProUGUI AjouterLabel(Transform parent, string texte, float taille, Color couleur)
