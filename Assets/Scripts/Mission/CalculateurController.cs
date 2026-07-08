@@ -106,6 +106,16 @@ public class CalculateurController : MonoBehaviour
                  (vrai ? "<color=#59C96A>VRAI</color>" : "<color=#FF6B6B>FAUX</color>") + "\n\n" +
                  $"<color=#FFD27F>Console.WriteLine(\"{gs.cpuVerdict}\")</color>";
         }
+        else if (q != null && q.kind == QuestKind.TantQue)
+        {
+            // while (somme >= 20) somme -= 20 — un tour par visite
+            op = $"somme = <color=#00D9FF>{gs.cpuAvant}</color>\n\n" +
+                 $"while (somme >= 20)  →  " +
+                 (gs.cpuWhileVrai ? "<color=#59C96A>VRAI</color>" : "<color=#FF6B6B>FAUX</color>") + "\n\n" +
+                 (gs.cpuWhileVrai
+                    ? $"<color=#FFD27F>somme = {gs.cpuAvant} - 20 = {gs.cpuSomme}</color>"
+                    : $"<color=#FFD27F>La boucle s'arrête ({gs.cpuToursWhile} tour{(gs.cpuToursWhile > 1 ? "s" : "")})</color>");
+        }
 
         Txt(op, new Vector2(0.1f, 0.42f), new Vector2(0.9f, 0.78f), 60f, Color.white, FontStyles.Bold, canvasGO.transform);
 

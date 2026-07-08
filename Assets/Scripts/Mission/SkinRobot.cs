@@ -88,7 +88,9 @@ public class SkinRobot : MonoBehaviour
         Color c = Skins[Mathf.Clamp(SkinActuel, 0, Skins.Length - 1)].couleur;
         foreach (var rend in pg.GetComponentsInChildren<Renderer>(true))
         {
-            if (rend.GetComponent<TMP_Text>() != null) continue; // pas les textes
+            if (rend.GetComponent<TMP_Text>() != null) continue;            // pas les textes
+            if (rend.GetComponentInParent<PickupItem>() != null) continue;  // pas la boîte portée !
+            if (rend.GetComponentInParent<DataBox>()    != null) continue;  // (double sécurité)
             foreach (var mat in rend.materials)
             {
                 if      (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", c);

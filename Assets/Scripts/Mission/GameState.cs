@@ -24,7 +24,8 @@ public enum QuestKind
     SaisieEcran,  // Console.ReadLine() sur l'écran : taper une valeur puis ranger la box en RAM
     Parse,        // z = Int32.Parse(y) : apporter y au CPU, ranger z en RAM
     ConditionIf,  // if (somme > seuil) : apporter somme au CPU, afficher le message de la branche
-    Boucle        // for (i = 0; i < 3; i++) : le CPU donne i à chaque tour, ranger en RAM
+    Boucle,       // for (i = 0; i < 3; i++) : le CPU donne i à chaque tour, ranger en RAM
+    TantQue       // while (somme >= 20) somme -= 20 : navettes RAM ↔ CPU jusqu'au test FAUX
 }
 
 /// <summary>
@@ -236,6 +237,7 @@ public class GameState : MonoBehaviour
         HumourOS.Ensure();        // répliques ironiques de l'OS
         MiniCarte.Ensure();       // minimap circuit imprimé (bas-droit)
         SkinRobot.Ensure();       // teinte du robot (débloquée par badges)
+        BanniereChapitre.Ensure();// bannière de fin de chapitre
         DemarrerChronoMission();  // base de temps de la 1re mission
     }
 
@@ -305,6 +307,12 @@ public class GameState : MonoBehaviour
             "// à chaque tour : range i dans la RAM (0, puis 1, puis 2) — même adresse !",
             QuestKind.Boucle,
             "Va au CPU : il lance la boucle et te donne la boîte i."));
+
+        quests.Add(new Quest(
+            "9.  while (somme >= 20) somme -= 20;",
+            "// tant que somme >= 20 : enlève 20 — le nombre de tours dépend de la valeur !",
+            QuestKind.TantQue,
+            "Prends une copie de somme dans la RAM et apporte-la au CPU."));
     }
 
     // ── Étapes internes de la mission active ─────────────────────────────
@@ -320,7 +328,10 @@ public class GameState : MonoBehaviour
     // Valeurs mémorisées par le CPU (affichage de la scène Calculateur).
     [System.NonSerialized] public long   cpuX, cpuZ, cpuSomme;
     [System.NonSerialized] public string cpuY = "";
-    [System.NonSerialized] public string cpuVerdict = ""; // "grand" / "petit" (ligne 7)
+    [System.NonSerialized] public string cpuVerdict = "";  // "grand" / "petit" (ligne 7)
+    [System.NonSerialized] public long   cpuAvant;          // somme avant le tour de while (ligne 9)
+    [System.NonSerialized] public bool   cpuWhileVrai;      // résultat du dernier test while
+    [System.NonSerialized] public int    cpuToursWhile;     // tours effectués (affichage final)
 
     /// <summary>Couleur standard d'un type (utilisée sur les boîtes et les textes RAM).</summary>
     public static Color CouleurType(string type)
@@ -368,6 +379,12 @@ public class GameState : MonoBehaviour
                 return missionEtape < 3
                     ? $"Va au CPU : itération i = {missionEtape} (tour {missionEtape + 1}/3)."
                     : "Retourne au CPU pour le test final : i < 3 ?";
+            case QuestKind.TantQue:
+                if (boxExists && boxVariable == "somme")
+                    return boxVientDeRam
+                        ? "Apporte la boîte somme au CPU (il fera le test)."
+                        : $"Range somme = {boxValue} dans la RAM, puis reprends une copie.";
+                return "Prends une copie de somme dans la RAM et apporte-la au CPU.";
             default:
                 return q.indication;
         }
@@ -554,6 +571,40 @@ public class GameState : MonoBehaviour
             }
             return "Le CPU attend la boîte somme (prends une copie dans la RAM).";
         }
+
+        // Ligne 9 : while (somme >= 20) somme -= 20 — un tour par visite.
+        if (q.kind == QuestKind.TantQue)
+        {
+            if (boxVariable == "somme" && boxVientDeRam)
+            {
+                long.TryParse(boxValue, out cpuAvant);
+                cpuWhileVrai = cpuAvant >= 20;
+
+                if (cpuWhileVrai)
+                {
+                    cpuSomme = cpuAvant - 20;
+                    ConsommerBoxEnMain();
+                    EnregistrerBox("somme", cpuSomme.ToString(), "int", CouleurType("int"));
+                    spawnDansLaMain = true; // le CPU te rend somme réduite en main
+                    missionEtape++;         // compte les tours effectués
+                    AudioFX.Succes(); MajIndication(); Sauvegarder();
+                    return $"while ({cpuAvant} >= 20) → VRAI.  somme = {cpuAvant} - 20 = {cpuSomme}.  " +
+                           "Range-la en RAM, puis rapporte une copie : on reteste !";
+                }
+
+                // Test FAUX → la boucle (et le programme) se termine.
+                ConsommerBoxEnMain();
+                cpuSomme = cpuAvant;
+                cpuToursWhile = missionEtape; // avant le reset fait par la validation
+                string msg = $"while ({cpuAvant} >= 20) → FAUX.  La boucle s'arrête après " +
+                             $"{cpuToursWhile} tour{(cpuToursWhile > 1 ? "s" : "")} : programme terminé !";
+                CompleterQueteActuelle();
+                return msg;
+            }
+            if (boxVariable == "somme")
+                return "Cette somme sort du CPU : range-la d'abord dans la RAM, puis rapporte une copie.";
+            return "Le CPU attend la boîte somme (prends une copie dans la RAM).";
+        }
         return null;
     }
 
@@ -617,6 +668,14 @@ public class GameState : MonoBehaviour
         Badges.MissionTerminee(dureeMission, erreursMission);
         if (q.kind == QuestKind.ConditionIf) Badges.Logicien();
         if (q.kind == QuestKind.Boucle)      Badges.Boucleur();
+
+        // Bannières de fin de chapitre (jalons du programme).
+        if      (questIndex == 5) BanniereChapitre.Afficher("CHAPITRE 1 TERMINÉ",
+                     "Les bases : variables, mémoire, affichage, saisie, calcul");
+        else if (questIndex == 6) BanniereChapitre.Afficher("CHAPITRE 2 TERMINÉ",
+                     "La condition if : VRAI ou FAUX, le programme choisit sa route");
+        else if (questIndex == 8) BanniereChapitre.Afficher("CHAPITRE 3 TERMINÉ",
+                     "Les boucles for et while : répéter jusqu'à ce que le test dise stop");
 
         if (questIndex < quests.Count - 1) questIndex++;
         missionEtape = 0; // chaque mission repart à son étape 0
@@ -884,6 +943,11 @@ public class GameState : MonoBehaviour
     public void ReinitialiserCampagne()
     {
         EffacerSauvegarde();
+
+        // Nouvelle partie = tout repart de zéro : badges, skin, récompenses.
+        Badges.ToutEffacer();
+        PlayerPrefs.DeleteKey("cda_skin"); // retour au robot Standard
+        PlayerPrefs.Save();
 
         quests.Clear();
         _questsInit = false;

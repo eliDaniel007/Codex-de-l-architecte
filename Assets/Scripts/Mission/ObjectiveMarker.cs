@@ -129,6 +129,11 @@ public class ObjectiveMarker : MonoBehaviour
                 case QuestKind.Boucle:
                     _cible = gs.boxExists ? PortailRam() : TourCpu();
                     break;
+
+                // 9. while : copie de somme en main → CPU ; somme réduite → RAM ; sinon → RAM.
+                case QuestKind.TantQue:
+                    _cible = (gs.boxExists && gs.boxVientDeRam) ? TourCpu() : PortailRam();
+                    break;
             }
         }
 
