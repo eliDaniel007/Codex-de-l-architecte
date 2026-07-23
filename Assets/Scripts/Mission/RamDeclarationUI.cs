@@ -23,6 +23,7 @@ public class RamDeclarationUI : MonoBehaviour
     public static void OuvrirPourType(string type)
     {
         if (Instance == null) return;
+        if (GameState.I.BriefingEnAttente()) return; // briefing d'abord (message géré au clic)
         Instance.ChoisirType(type);
         Instance.Ouvrir();
     }
@@ -49,6 +50,9 @@ public class RamDeclarationUI : MonoBehaviour
 
     void Update()
     {
+        // Briefing obligatoire : pas de déclaration tant que la ligne n'est pas lue.
+        if (!PanneauOuvert && GameState.I.BriefingEnAttente()) return;
+
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb == null) return;

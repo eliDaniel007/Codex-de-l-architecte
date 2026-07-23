@@ -80,9 +80,55 @@ public class CPUSceneController : MonoBehaviour
         fr.anchorMin = Vector2.zero; fr.anchorMax = Vector2.one;
         fr.offsetMin = fr.offsetMax = Vector2.zero;
 
-        // Titre
-        AjouterTexte(canvasGO.transform, "<color=#00D9FF>CPU</color>  —  LE PROGRAMME À EXÉCUTER",
-            new Vector2(0.1f, 0.85f), new Vector2(0.9f, 0.95f), 62f, Color.white,
+        // Liseré CYAN en haut : signature visuelle de l'unité de contrôle
+        // (l'UAL, elle, est orange).
+        var lisere = new GameObject("Lisere");
+        lisere.transform.SetParent(canvasGO.transform, false);
+        var lImg = lisere.AddComponent<Image>();
+        lImg.color = new Color(0f, 0.85f, 1f, 0.95f);
+        var lrr = lisere.GetComponent<RectTransform>();
+        lrr.anchorMin = new Vector2(0f, 0.965f); lrr.anchorMax = new Vector2(1f, 1f);
+        lrr.offsetMin = lrr.offsetMax = Vector2.zero;
+
+        // GRANDE BANDE CYAN à gauche avec « CONTRÔLE » en vertical.
+        var bande = new GameObject("BandeUnite");
+        bande.transform.SetParent(canvasGO.transform, false);
+        var bImg = bande.AddComponent<Image>();
+        bImg.color = new Color(0f, 0.85f, 1f, 0.9f);
+        var brr = bande.GetComponent<RectTransform>();
+        brr.anchorMin = new Vector2(0f, 0f); brr.anchorMax = new Vector2(0.055f, 0.965f);
+        brr.offsetMin = brr.offsetMax = Vector2.zero;
+
+        var bandeTxtGO = new GameObject("BandeLabel");
+        bandeTxtGO.transform.SetParent(bande.transform, false);
+        var bandeTxt = bandeTxtGO.AddComponent<TextMeshProUGUI>();
+        bandeTxt.text = "C O N T R Ô L E";
+        bandeTxt.fontSize = 52f; bandeTxt.fontStyle = FontStyles.Bold;
+        bandeTxt.color = new Color(0f, 0.1f, 0.15f);
+        bandeTxt.alignment = TextAlignmentOptions.Center;
+        bandeTxt.raycastTarget = false;
+        var btr = bandeTxtGO.GetComponent<RectTransform>();
+        btr.anchorMin = new Vector2(0.5f, 0.5f); btr.anchorMax = new Vector2(0.5f, 0.5f);
+        btr.sizeDelta = new Vector2(800f, 100f);
+        bandeTxtGO.transform.localRotation = Quaternion.Euler(0f, 0f, 90f); // vertical
+
+        // Filigrane « { } » géant en fond (la signature du programme)
+        var filiGO = new GameObject("Filigrane");
+        filiGO.transform.SetParent(canvasGO.transform, false);
+        var fili = filiGO.AddComponent<TextMeshProUGUI>();
+        fili.text = "{ }";
+        fili.fontSize = 550f; fili.fontStyle = FontStyles.Bold;
+        fili.color = new Color(0f, 0.85f, 1f, 0.05f);
+        fili.alignment = TextAlignmentOptions.Center;
+        fili.raycastTarget = false;
+        var ftr = filiGO.GetComponent<RectTransform>();
+        ftr.anchorMin = new Vector2(0.2f, 0.05f); ftr.anchorMax = new Vector2(1f, 0.9f);
+        ftr.offsetMin = ftr.offsetMax = Vector2.zero;
+
+        // Titre : l'unité de CONTRÔLE lit le programme et pilote les missions.
+        // (L'autre moitié du CPU, l'unité ARITHMÉTIQUE, fait les calculs.)
+        AjouterTexte(canvasGO.transform, "<color=#00D9FF>CPU — UNITÉ DE CONTRÔLE</color>  ·  LE PROGRAMME",
+            new Vector2(0.05f, 0.85f), new Vector2(0.95f, 0.95f), 56f, Color.white,
             TextAlignmentOptions.Center, FontStyles.Bold);
 
         // Sous-titre : ligne de code active
@@ -180,10 +226,15 @@ public class CPUSceneController : MonoBehaviour
         txtGO.transform.SetParent(go.transform, false);
         var tmp = txtGO.AddComponent<TextMeshProUGUI>();
         tmp.text       = texte;
-        tmp.fontSize   = 27f;
         tmp.color      = couleur;
         tmp.richText   = true;
         tmp.alignment  = TextAlignmentOptions.TopLeft;
+        // Auto-dimensionnement : une ligne longue rétrécit au lieu de déborder
+        // sur la ligne suivante (les textes ne se mélangent plus).
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMin = 15f;
+        tmp.fontSizeMax = 27f;
+        tmp.overflowMode = TextOverflowModes.Ellipsis;
         var tr = txtGO.GetComponent<RectTransform>();
         tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
         tr.offsetMin = new Vector2(20f, 10f); tr.offsetMax = new Vector2(-20f, -10f);

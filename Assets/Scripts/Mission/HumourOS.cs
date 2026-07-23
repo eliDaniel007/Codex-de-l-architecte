@@ -39,9 +39,8 @@ public class HumourOS : MonoBehaviour
         while (choix == Instance._derniere && NB_REPLIQUES_ERREUR > 1);
         Instance._derniere = choix;
 
-        var clip = Resources.Load<AudioClip>("Voix/err" + choix);
-        if (clip == null) return;
-        Instance._src.PlayOneShot(clip, 0.9f);
+        // Via la FILE globale : jamais par-dessus une autre voix.
+        FileVoix.Jouer("err" + choix);
     }
 
     void Awake()

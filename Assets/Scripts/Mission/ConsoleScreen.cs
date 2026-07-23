@@ -38,15 +38,6 @@ public class ConsoleScreen : MonoBehaviour
         Transform anchor = screenFace != null ? screenFace : transform;
         _screenText = Setup3DMonitorText(anchor);
 
-        // Mission 3 : y est déclarée → l'écran attend que tu viennes chercher le nombre.
-        var gs = GameState.I;
-        var q  = gs.QueteActuelle();
-        if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 1)
-        {
-            MontrerSurMoniteur("<size=40%>Console.ReadLine()\n" +
-                               "<color=#FFD27F>En attente de récupération...</color>\n" +
-                               "Viens chercher le nombre  [E]</size>");
-        }
     }
 
     private void FindPlayer()
@@ -93,10 +84,11 @@ public class ConsoleScreen : MonoBehaviour
                 }
             }
             else if (q != null && !q.complete && q.kind == QuestKind.ConditionIf &&
-                     gs.missionEtape == 1 && db.variableName == "message")
+                     gs.missionEtape == 1)
             {
-                // Ligne 7 : le message de la branche du if s'affiche → programme terminé.
-                AfficherEtConsommer(held, db, valider: true);
+                // Ligne 7 : ce n'est pas l'écran qui consomme le booléen — il faut
+                // TRAVERSER la porte de la branche qui s'exécute.
+                PromptUI.Show("Passe par la <b>PORTE</b> de la branche qui s'exécute — l'écran affichera son message.");
             }
             else if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 2)
             {
@@ -107,18 +99,21 @@ public class ConsoleScreen : MonoBehaviour
                 // Campagne finie : affichage libre (bac à sable).
                 AfficherEtConsommer(held, db, valider: false);
             }
-            else
+            else if (!gs.EnGrace)
             {
-                // Une mission est en cours et cette boîte ne va pas sur l'écran :
+                // Une mission est en cours et cette valeur ne va pas sur l'écran :
                 // on NE la détruit PAS (elle sert ailleurs — CPU ou RAM).
-                PromptUI.Show("Cette boîte n'est pas destinée à l'écran pour l'instant.");
+                string ou = GameState.NomStation(gs.StationAttendue());
+                PromptUI.Show($"<color=#FF6B6B>Pas sur l'écran !</color>  Cette valeur va vers <b>{ou}</b>.");
             }
         }
-        else if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && gs.missionEtape == 1)
+        else
         {
-            // ── Console.ReadLine : l'utilisateur envoie une valeur ──
-            PromptUI.Show("[E]  <color=#00D9FF>Console.ReadLine()</color>  —  recevoir la saisie de l'utilisateur");
-            if (AppuyeE()) RecevoirReadLine();
+            // Mains vides devant l'écran alors que la mission attend ailleurs —
+            // sauf juste après une interaction réussie (période de grâce).
+            string attendue = gs.StationAttendue();
+            if (!gs.EnGrace && attendue != "ecran" && attendue != "")
+                PromptUI.Show($"<color=#FF6B6B>Rien à afficher ici !</color>  Va plutôt vers <b>{GameState.NomStation(attendue)}</b>.");
         }
     }
 
@@ -142,17 +137,14 @@ public class ConsoleScreen : MonoBehaviour
         MontrerSurMoniteur(estString ? $"\"{valeur}\"" : valeur);
     }
 
-    // ── Console.ReadLine (mission 3) ──────────────────────────────────────
+    // Accès statique au moniteur (utilisé par les portes du if).
+    static ConsoleScreen _instance;
 
-    /// <summary>L'utilisateur « tape » un nombre aléatoire → box  string y  en main.</summary>
-    void RecevoirReadLine()
+    /// <summary>Affiche un texte sur le moniteur 3D de la console.</summary>
+    public static void AfficherSurMoniteur(string texte)
     {
-        string val = Random.Range(10, 100).ToString(); // le nombre envoyé par l'utilisateur
-
-        PromptUI.Hide();
-        MontrerSurMoniteur($"> {val}_"); // écho console
-
-        GameState.I.SaisirLigne(val); // → box  string y  directement en main
+        if (_instance == null) _instance = FindFirstObjectByType<ConsoleScreen>();
+        if (_instance != null) _instance.MontrerSurMoniteur(texte);
     }
 
     void MontrerSurMoniteur(string texte)

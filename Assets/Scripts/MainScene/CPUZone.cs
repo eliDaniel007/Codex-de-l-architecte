@@ -87,9 +87,9 @@ public class CPUZone : MonoBehaviour
         var gs = GameState.I;
         var q  = gs.QueteActuelle();
         bool versCalculateur = q != null && gs.boxExists &&
-            ((q.kind == QuestKind.Parse       && gs.missionEtape == 0 && gs.boxVariable == "y")     || // z = Int32.Parse(y)
-             (q.kind == QuestKind.Calcul      && gs.missionEtape == 0 && gs.boxVariable == "x")     || // somme = x + z (x)
-             (q.kind == QuestKind.Calcul      && gs.missionEtape == 1 && gs.boxVariable == "z")     || // somme = x + z (z)
+            ((q.kind == QuestKind.Parse       && gs.missionEtape == 1 && gs.boxVariable == "y")     || // z = Int32.Parse(y)
+             (q.kind == QuestKind.Calcul      && gs.missionEtape == 1 && gs.boxVariable == "x")     || // somme = x + z (x)
+             (q.kind == QuestKind.Calcul      && gs.missionEtape == 2 && gs.boxVariable == "z")     || // somme = x + z (z)
              (q.kind == QuestKind.ConditionIf && gs.missionEtape == 0 && gs.boxVariable == "somme") || // if (somme > 50)
              (q.kind == QuestKind.TantQue     && gs.boxVariable == "somme" && gs.boxVientDeRam));      // while (somme >= 20)
 

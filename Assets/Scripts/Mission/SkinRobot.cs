@@ -20,7 +20,7 @@ public class SkinRobot : MonoBehaviour
         ("Émeraude", new Color(0.55f, 1f, 0.72f),      4),
         ("Or",       new Color(1f, 0.85f, 0.45f),      6),
         ("Violet",   new Color(0.82f, 0.62f, 1f),      8),
-        ("Rubis",    new Color(1f, 0.5f, 0.5f),       10),
+        ("Rubis",    new Color(1f, 0.5f, 0.5f),       11), // TOUS les badges (chap. 1 + 2)
     };
 
     public static int SkinActuel => PlayerPrefs.GetInt("cda_skin", 0);

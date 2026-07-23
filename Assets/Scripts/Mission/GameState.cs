@@ -148,6 +148,8 @@ public class GameState : MonoBehaviour
     public Color    boxColor    = new Color(0f, 0.85f, 1f); // Default cyan
     public Material boxMaterialAsset; // On stocke le matériau d'origine
     public bool     boxExists;     // une box logique existe (sol, main, en transit)
+    [Tooltip("Vrai si on porte une VALEUR nue (pas de boîte : juste la valeur sur la tête).")]
+    public bool     boxEstValeur;
 
     // Prefab de la boîte portée (celui de la RAM) — fourni par MissionConfig.
     [System.NonSerialized] public GameObject boxPrefab;
@@ -272,21 +274,21 @@ public class GameState : MonoBehaviour
 
         quests.Add(new Quest(
             "3.  string y = Console.ReadLine();",
-            "// déclare d'abord string y, puis récupère le nombre de l'utilisateur et mets-le dans y",
+            "// déclare string y, puis récupère AU CLAVIER la valeur tapée par l'utilisateur et range-la dans y",
             QuestKind.SaisieEcran,
             "Dans la RAM : clique la boîte string → déclare y, sauvegarde."));
 
         quests.Add(new Quest(
-            "4.  z = Int32.Parse(y);",
-            "// convertit y (caractères) en entier et le range dans z",
+            "4.  int z = Int32.Parse(y);",
+            "// déclare int z, puis convertit la valeur de y en entier et range-la dans z",
             QuestKind.Parse,
-            "Prends y dans la RAM et apporte-le au CPU."));
+            "Dans la RAM : clique la boîte int → déclare z (vide), sauvegarde."));
 
         quests.Add(new Quest(
-            "5.  somme = x + z;",
-            "// additionne x et z",
+            "5.  int somme = x + z;",
+            "// déclare int somme (réserve sa place), puis additionne les valeurs de x et z dans somme",
             QuestKind.Calcul,
-            "Prends x dans la RAM et apporte-le au CPU."));
+            "Dans la RAM : clique la boîte int → déclare somme (vide), sauvegarde."));
 
         quests.Add(new Quest(
             "6.  Console.WriteLine(somme);",
@@ -297,22 +299,19 @@ public class GameState : MonoBehaviour
         // ── CHAPITRE 2 : la condition ──
         quests.Add(new Quest(
             "7.  if (somme > 50) ... else ...",
-            "// si somme > 50 : affiche \"grand\" — sinon : affiche \"petit\"",
+            "// vrai → \"grand\", faux → \"petit\" : une seule branche s'exécute",
             QuestKind.ConditionIf,
-            "Prends une copie de somme dans la RAM et apporte-la au CPU."));
+            "Dans la RAM : clique somme pour copier sa valeur, puis va au CPU."));
 
-        // ── CHAPITRE 3 : la boucle ──
-        quests.Add(new Quest(
-            "8.  for (int i = 0; i < 3; i++)",
-            "// à chaque tour : range i dans la RAM (0, puis 1, puis 2) — même adresse !",
-            QuestKind.Boucle,
-            "Va au CPU : il lance la boucle et te donne la boîte i."));
-
-        quests.Add(new Quest(
-            "9.  while (somme >= 20) somme -= 20;",
-            "// tant que somme >= 20 : enlève 20 — le nombre de tours dépend de la valeur !",
-            QuestKind.TantQue,
-            "Prends une copie de somme dans la RAM et apporte-la au CPU."));
+        // ─────────────────────────────────────────────────────────────────
+        // NOTE POUR LE PROCHAIN DÉVELOPPEUR :
+        // Le CHAPITRE 3 (ligne 8 : for / ligne 9 : while) est RETIRÉ de la
+        // campagne pour l'instant. Toute sa logique existe encore et est
+        // fonctionnelle (QuestKind.Boucle / TantQue, BoucleCpu, CPUZone,
+        // ObjectiveMarker, CalculateurController, voix m8/m9). Pour le
+        // réactiver : ajouter ici les quêtes et migrer leurs échanges vers le
+        // système de VALEURS nues (boxEstValeur), comme les lignes 3-5 et 7.
+        // ─────────────────────────────────────────────────────────────────
     }
 
     // ── Étapes internes de la mission active ─────────────────────────────
@@ -329,19 +328,35 @@ public class GameState : MonoBehaviour
     [System.NonSerialized] public long   cpuX, cpuZ, cpuSomme;
     [System.NonSerialized] public string cpuY = "";
     [System.NonSerialized] public string cpuVerdict = "";  // "grand" / "petit" (ligne 7)
+    [System.NonSerialized] public bool   cpuIfVrai;         // résultat du test if (ligne 7)
     [System.NonSerialized] public long   cpuAvant;          // somme avant le tour de while (ligne 9)
     [System.NonSerialized] public bool   cpuWhileVrai;      // résultat du dernier test while
     [System.NonSerialized] public int    cpuToursWhile;     // tours effectués (affichage final)
 
     /// <summary>Couleur standard d'un type (utilisée sur les boîtes et les textes RAM).</summary>
+    // Palette RÉELLE des types : échantillonnée sur les textes des boîtes de
+    // type de la scène RAM (bool, char, int, float, string) au chargement.
+    static readonly Dictionary<string, Color> _paletteTypes = new Dictionary<string, Color>();
+
+    /// <summary>Mémorise la couleur réelle d'un type (lue sur sa boîte de la RAM).</summary>
+    public static void DefinirCouleurType(string type, Color c)
+    {
+        _paletteTypes[type] = c;
+    }
+
+    /// <summary>Couleur officielle d'un type : celle du texte de SA boîte dans la
+    /// RAM (échantillonnée). Valeurs de secours calées sur les textures.</summary>
     public static Color CouleurType(string type)
     {
-        switch (type)
+        if (_paletteTypes.TryGetValue(type, out var c)) return c;
+
+        switch (type) // secours : approximation des couleurs des boîtes
         {
-            case "int":    return new Color(1f, 0.25f, 0.25f); // rouge
-            case "float":  return new Color(1f, 0.4f, 0.7f);   // rose
-            case "string": return new Color(0.8f, 0.4f, 1f);   // violet
-            case "bool":   return new Color(0.4f, 0.9f, 0.5f); // vert
+            case "int":    return new Color(0.80f, 0.05f, 0.05f); // rouge
+            case "float":  return new Color(0.75f, 0.15f, 0.90f); // magenta
+            case "string": return new Color(0.20f, 0.20f, 0.85f); // bleu
+            case "char":   return new Color(0.15f, 0.30f, 0.95f); // bleu clair
+            case "bool":   return new Color(0.10f, 0.10f, 0.14f); // noir
             default:       return Color.white;
         }
     }
@@ -359,20 +374,28 @@ public class GameState : MonoBehaviour
                 return $"Prends une copie de {q.cibleVariable} dans la RAM et pose-la sur l'écran.";
             case QuestKind.SaisieEcran:
                 if (missionEtape == 0) return "Dans la RAM : clique la boîte string → déclare y, sauvegarde.";
-                if (missionEtape == 1) return "Va à l'écran : [E] Console.ReadLine() — récupère la valeur.";
-                return "Range la boîte y dans la RAM (elle écrase l'ancienne).";
+                if (missionEtape == 1) return "Va au CLAVIER : [E] Console.ReadLine() — récupère la valeur tapée.";
+                return "Dans la RAM : clique la variable y pour y ranger la valeur.";
             case QuestKind.Parse:
-                return missionEtape == 0
-                    ? "Prends y dans la RAM et apporte-le au CPU."
-                    : "Range la boîte z (int) dans la RAM.";
+                if (missionEtape == 0) return "Dans la RAM : clique la boîte int → déclare z (vide), sauvegarde.";
+                if (missionEtape == 1) return boxExists
+                    ? "Apporte la valeur de y au CPU : il la convertira en entier."
+                    : "Dans la RAM : clique y pour copier sa valeur, puis va au CPU.";
+                return "Dans la RAM : clique la variable z pour y ranger l'entier converti.";
             case QuestKind.Calcul:
-                if (missionEtape == 0) return "Prends x dans la RAM et apporte-le au CPU.";
-                if (missionEtape == 1) return "Prends z dans la RAM et apporte-le au CPU.";
-                return "Range la boîte somme dans la RAM.";
+                if (missionEtape == 0) return "Dans la RAM : clique la boîte int → déclare somme (vide), sauvegarde.";
+                if (missionEtape == 1) return boxExists
+                    ? "Apporte la valeur de x au CPU (unité arithmétique)."
+                    : "Dans la RAM : clique x pour copier sa valeur, puis va au CPU.";
+                if (missionEtape == 2) return boxExists
+                    ? "Apporte la valeur de z au CPU."
+                    : "Dans la RAM : clique z pour copier sa valeur, puis va au CPU.";
+                return "Dans la RAM : clique la variable somme pour y ranger le résultat.";
             case QuestKind.ConditionIf:
-                return missionEtape == 0
-                    ? "Prends une copie de somme dans la RAM et apporte-la au CPU."
-                    : "Pose la boîte message sur l'écran (le résultat du if).";
+                if (missionEtape == 0) return boxExists
+                    ? "Apporte la valeur de somme au CPU : l'UAL fera le test."
+                    : "Dans la RAM : clique somme pour copier sa valeur, puis va au CPU.";
+                return "Passe la PORTE de la branche qui s'exécute (devant l'écran).";
             case QuestKind.Boucle:
                 if (boxExists && boxVariable == "i")
                     return $"Range la boîte i = {boxValue} dans la RAM (tour {missionEtape + 1}/3).";
@@ -390,9 +413,70 @@ public class GameState : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// La station où le joueur DOIT aller maintenant : "cpu", "ram", "clavier",
+    /// "ecran" — ou "" si campagne finie. Sert aux messages « mauvaise station ».
+    /// </summary>
+    public string StationAttendue()
+    {
+        if (ToutesQuetesTerminees()) return "";
+        if (BriefingEnAttente())     return "cpu"; // lire la prochaine ligne d'abord !
+
+        var q = QueteActuelle();
+        if (q == null) return "";
+        switch (q.kind)
+        {
+            case QuestKind.DeclarationRam:
+                return "ram";
+            case QuestKind.LectureRam:
+                return boxExists ? "ecran" : "ram";
+            case QuestKind.SaisieEcran:
+                if (missionEtape == 1) return boxExists ? "ram" : "clavier";
+                return "ram";
+            case QuestKind.Parse:
+                return (missionEtape == 1 && boxExists) ? "cpu" : "ram";
+            case QuestKind.Calcul:
+                return ((missionEtape == 1 || missionEtape == 2) && boxExists) ? "cpu" : "ram";
+            case QuestKind.ConditionIf:
+                if (missionEtape == 0) return boxExists ? "cpu" : "ram";
+                return "ecran"; // les portes des branches sont devant l'écran
+            default:
+                return "";
+        }
+    }
+
+    /// <summary>Nom lisible d'une station (pour les messages).</summary>
+    public static string NomStation(string id)
+    {
+        switch (id)
+        {
+            case "cpu":     return "le CPU";
+            case "ram":     return "la RAM";
+            case "clavier": return "le clavier";
+            case "ecran":   return "l'écran";
+            default:        return "ta prochaine destination";
+        }
+    }
+
+    // ── période de grâce après une interaction réussie ────────────────────
+    // Empêche les messages « mauvaise station » de s'afficher à la seconde
+    // même où le joueur vient de réussir quelque chose au même endroit.
+
+    private float _finGrace;
+
+    /// <summary>Vrai pendant les quelques secondes qui suivent une interaction réussie.</summary>
+    public bool EnGrace => Time.unscaledTime < _finGrace;
+
+    /// <summary>Accorde une période de grâce (pas de messages de redirection).</summary>
+    public void AccorderGrace(float secondes = 10f)
+    {
+        _finGrace = Mathf.Max(_finGrace, Time.unscaledTime + secondes);
+    }
+
     /// <summary>Met à jour la consigne du HUD + marqueur après un changement d'étape.</summary>
     void MajIndication()
     {
+        AccorderGrace(); // une étape vient d'être franchie : pas de « mauvaise station » immédiat
         var q = QueteActuelle();
         if (q != null) q.indication = IndicationActuelle();
         MissionHUD.Refresh();
@@ -420,27 +504,36 @@ public class GameState : MonoBehaviour
     /// </summary>
     public string DeclarerEnRam(string type, string nom, string valeur)
     {
+        // Briefing obligatoire : la prochaine ligne doit être lue au CPU d'abord.
+        if (BriefingEnAttente())
+            return "Retourne au CPU (unité de contrôle) lire la prochaine ligne";
+
         nom    = (nom    ?? "").Trim();
         valeur = (valeur ?? "").Trim();
 
         if (!System.Text.RegularExpressions.Regex.IsMatch(nom, @"^[A-Za-z_][A-Za-z0-9_]*$"))
             return "Nom invalide : lettres/chiffres sans espaces (ex : x).";
 
+        // Une valeur VIDE est permise pour tous les types : on déclare la
+        // variable (on réserve sa place en mémoire), on la remplira plus tard.
         switch (type)
         {
             case "int":
-                if (!long.TryParse(valeur, out _)) return "Un int est un nombre entier (ex : 4).";
+                if (valeur.Length > 0 && !long.TryParse(valeur, out _))
+                    return "Un int est un nombre entier (ex : 4) — ou vide.";
                 break;
             case "float":
-                if (!double.TryParse(valeur.Replace(',', '.'), System.Globalization.NumberStyles.Any,
+                if (valeur.Length > 0 && !double.TryParse(valeur.Replace(',', '.'),
+                        System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out _))
-                    return "Un float est un nombre (ex : 2.5).";
+                    return "Un float est un nombre (ex : 2.5) — ou vide.";
                 break;
             case "bool":
                 valeur = valeur.ToLowerInvariant();
-                if (valeur != "true" && valeur != "false") return "Un bool vaut true ou false.";
+                if (valeur.Length > 0 && valeur != "true" && valeur != "false")
+                    return "Un bool vaut true ou false — ou vide.";
                 break;
-            default: // string (peut être vide : on la remplira plus tard, ex. y)
+            default: // string
                 valeur = valeur.Trim('"');
                 break;
         }
@@ -463,13 +556,7 @@ public class GameState : MonoBehaviour
         s.color  = CouleurType(type);
 
         AudioFX.Depot();
-
-        // Badges liés à la déclaration
-        Badges.PremiereBoite();
-        if (type == "float") Badges.PremierFloat();
-        int occupees = 0;
-        foreach (var slot in ramSlots) if (slot.filled) occupees++;
-        Badges.MemoireBienRemplie(occupees);
+        AccorderGrace(); // déclaration réussie : pas de message immédiat
 
         if (m1)
         {
@@ -478,7 +565,23 @@ public class GameState : MonoBehaviour
         else if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran &&
                  missionEtape == 0 && nom == "y" && type == "string")
         {
-            // Mission 3, étape 1 franchie : string y déclarée → direction l'écran.
+            // Ligne 3, étape franchie : string y déclarée → direction le clavier.
+            missionEtape = 1;
+            AudioFX.Succes();
+            MajIndication();
+        }
+        else if (q != null && !q.complete && q.kind == QuestKind.Parse &&
+                 missionEtape == 0 && nom == "z" && type == "int")
+        {
+            // Ligne 4 : int z déclaré (place réservée) → aller chercher la valeur de y.
+            missionEtape = 1;
+            AudioFX.Succes();
+            MajIndication();
+        }
+        else if (q != null && !q.complete && q.kind == QuestKind.Calcul &&
+                 missionEtape == 0 && nom == "somme" && type == "int")
+        {
+            // Ligne 5 : int somme déclaré (place réservée) → chercher x, puis le CPU.
             missionEtape = 1;
             AudioFX.Succes();
             MajIndication();
@@ -487,19 +590,21 @@ public class GameState : MonoBehaviour
         return null;
     }
 
-    // ── Console.ReadLine() sur l'écran (mission 3) ────────────────────────
+    // ── Console.ReadLine() au CLAVIER (mission 3) ─────────────────────────
 
-    /// <summary>La valeur reçue par l'écran devient la box  string y  en main.</summary>
+    /// <summary>La valeur tapée par l'utilisateur arrive en main SANS NOM :
+    /// on ne sait pas encore qu'elle ira dans y — juste la valeur.</summary>
     public void SaisirLigne(string valeur)
     {
         derniereSaisie = valeur;
-        EnregistrerBox("y", valeur, "string", CouleurType("string"));
+        EnregistrerBox("", valeur, "string", CouleurType("string")); // pas de nom !
+        boxEstValeur = true;   // PAS de boîte : juste la valeur sur la tête
         spawnDansLaMain = true;
-        missionEtape = 2; // il reste à ranger y dans la RAM
+        missionEtape = 2; // il reste à ranger cette valeur dans y (RAM)
         AudioFX.Succes();
         MajIndication();
         Sauvegarder();
-        SpawnBoxMaintenant(); // la boîte apparaît directement dans la main
+        SpawnBoxMaintenant(); // la valeur apparaît directement en main
     }
 
     // ── Le CPU reçoit une box (missions 4 et 5) ───────────────────────────
@@ -513,63 +618,80 @@ public class GameState : MonoBehaviour
         // Mission 4 : z = Int32.Parse(y)
         if (q.kind == QuestKind.Parse)
         {
-            if (missionEtape == 0 && boxVariable == "y")
+            if (missionEtape == 0)
+                return "Déclare d'abord  int z  dans la RAM (réserve sa place).";
+            if (missionEtape == 1 && boxVariable == "y" && boxEstValeur)
             {
                 cpuY = boxValue;
                 long.TryParse(boxValue, out cpuZ);
                 ConsommerBoxEnMain();
-                EnregistrerBox("z", cpuZ.ToString(), "int", CouleurType("int"));
-                spawnDansLaMain = true; // le CPU te rend z en main
-                missionEtape = 1;
+                // Le CPU rend JUSTE la valeur convertie (un entier nu, sans nom).
+                EnregistrerBox("", cpuZ.ToString(), "int", CouleurType("int"));
+                boxEstValeur = true;
+                spawnDansLaMain = true;
+                missionEtape = 2;
                 AudioFX.MissionValidee(); MajIndication(); Sauvegarder();
-                return $"z = Int32.Parse(\"{cpuY}\") = {cpuZ}.  Range la boîte z dans la RAM.";
+                return $"Int32.Parse(\"{cpuY}\") = {cpuZ}.  Range cette valeur dans z (RAM).";
             }
-            return "Le CPU attend la boîte y (prends-la dans la RAM).";
+            if (missionEtape == 2)
+                return "Range l'entier converti dans z (clique la variable z dans la RAM).";
+            return "Le CPU attend la VALEUR de y (clique y dans la RAM pour la copier).";
         }
 
-        // Mission 5 : somme = x + z
+        // Ligne 5 : int somme = x + z — l'unité arithmétique additionne les VALEURS
         if (q.kind == QuestKind.Calcul)
         {
-            if (missionEtape == 0 && boxVariable == "x")
+            if (missionEtape == 0)
+                return "Déclare d'abord  int somme  dans la RAM (réserve sa place).";
+            if (missionEtape == 1 && boxVariable == "x" && boxEstValeur)
             {
                 long.TryParse(boxValue, out cpuX);
                 ConsommerBoxEnMain();
-                missionEtape = 1;
+                missionEtape = 2;
                 AudioFX.Succes(); MajIndication(); Sauvegarder();
-                return $"x = {cpuX} reçu.  Apporte maintenant z.";
+                return $"{cpuX} + ...   Apporte maintenant la deuxième valeur.";
             }
-            if (missionEtape == 1 && boxVariable == "z")
+            if (missionEtape == 2 && boxVariable == "z" && boxEstValeur)
             {
                 long.TryParse(boxValue, out cpuZ);
                 cpuSomme = cpuX + cpuZ;
                 ConsommerBoxEnMain();
-                EnregistrerBox("somme", cpuSomme.ToString(), "int", CouleurType("int"));
-                spawnDansLaMain = true; // le CPU te rend somme en main
-                missionEtape = 2;
+                // Le CPU rend JUSTE le résultat (une valeur nue, sans nom).
+                EnregistrerBox("", cpuSomme.ToString(), "int", CouleurType("int"));
+                boxEstValeur = true;
+                spawnDansLaMain = true;
+                missionEtape = 3;
                 AudioFX.MissionValidee(); MajIndication(); Sauvegarder();
-                return $"somme = x + z = {cpuX} + {cpuZ} = {cpuSomme}.  Range la boîte somme dans la RAM.";
+                return $"{cpuX} + {cpuZ} = {cpuSomme}.  Va ranger ce résultat en mémoire (RAM).";
             }
-            return missionEtape == 0 ? "Le CPU attend la boîte x (prends-la dans la RAM)."
-                                     : "Le CPU attend la boîte z (prends-la dans la RAM).";
+            if (missionEtape == 3)
+                return "Range le résultat dans somme (clique la variable somme dans la RAM).";
+            return missionEtape == 1 ? "Le CPU attend la VALEUR de x (clique x dans la RAM pour la copier)."
+                                     : "Le CPU attend la VALEUR de z (clique z dans la RAM pour la copier).";
         }
 
         // Ligne 7 : if (somme > SEUIL) → le CPU teste et donne le message de la branche
         if (q.kind == QuestKind.ConditionIf)
         {
-            if (missionEtape == 0 && boxVariable == "somme")
+            if (missionEtape == 0 && boxVariable == "somme" && boxEstValeur)
             {
                 long.TryParse(boxValue, out cpuSomme);
-                bool vrai  = cpuSomme > SEUIL_IF;
-                cpuVerdict = vrai ? "grand" : "petit";
+                cpuIfVrai  = cpuSomme > SEUIL_IF;
+                cpuVerdict = cpuIfVrai ? "grand" : "petit";
                 ConsommerBoxEnMain();
-                EnregistrerBox("message", cpuVerdict, "string", CouleurType("string"));
-                spawnDansLaMain = true; // le CPU te rend le message en main
+                // Le résultat d'une CONDITION est un BOOLÉEN : le CPU te le rend
+                // comme une valeur nue (true / false, couleur bool).
+                EnregistrerBox("condition", cpuIfVrai ? "true" : "false", "bool", CouleurType("bool"));
+                boxEstValeur = true;
+                spawnDansLaMain = true;
                 missionEtape = 1;
                 AudioFX.MissionValidee(); MajIndication(); Sauvegarder();
-                return $"if ({cpuSomme} > {SEUIL_IF}) → {(vrai ? "VRAI" : "FAUX")}.  " +
-                       $"La branche exécutée donne \"{cpuVerdict}\" : affiche ce message sur l'écran.";
+                return $"if ({cpuSomme} > {SEUIL_IF}) → {(cpuIfVrai ? "VRAI" : "FAUX")}.  " +
+                       "Le résultat du test est un BOOLÉEN. Devant l'écran : passe la porte de la branche qui s'exécute.";
             }
-            return "Le CPU attend la boîte somme (prends une copie dans la RAM).";
+            if (missionEtape == 1)
+                return "Tu as ton booléen : passe la PORTE de la bonne branche, devant l'écran.";
+            return "Le CPU attend la VALEUR de somme (copie-la dans la RAM).";
         }
 
         // Ligne 9 : while (somme >= 20) somme -= 20 — un tour par visite.
@@ -636,9 +758,27 @@ public class GameState : MonoBehaviour
         return "for :  i = 3 ;  i < 3 → FAUX.  La boucle s'arrête : ligne terminée !";
     }
 
+    /// <summary>
+    /// Le joueur traverse la BONNE porte de branche (ligne 7) avec son booléen :
+    /// la branche s'exécute → le message s'affichera, la ligne est validée.
+    /// Retourne le texte que la branche affiche ("grand"/"petit"), ou null.
+    /// </summary>
+    public string ValiderConditionIf()
+    {
+        var q = QueteActuelle();
+        if (q == null || q.complete || q.kind != QuestKind.ConditionIf) return null;
+        if (missionEtape != 1 || !boxExists || boxVariable != "condition") return null;
+
+        string verdict = cpuVerdict;
+        ConsommerBoxEnMain();
+        CompleterQueteActuelle();
+        return verdict;
+    }
+
     void ConsommerBoxEnMain()
     {
         boxExists       = false;
+        boxEstValeur    = false;
         boxVariable     = "";
         boxValue        = "";
         needsSpawn      = false;
@@ -660,22 +800,22 @@ public class GameState : MonoBehaviour
         var q = QueteActuelle();
         if (q == null) return;
         q.complete = true;
+        AccorderGrace(); // ligne réussie : pas de messages de redirection immédiats
 
         // ── Rating de la ligne : durée + erreurs depuis sa révélation ──
         float dureeMission   = TempsCampagne - _missionChronoDebut;
         int   erreursMission = nbErreurs - _missionErreursDebut;
         AnnoncerRatingMission(q, dureeMission, erreursMission);
+        Badges.LigneTerminee(q.kind); // le badge de la notion apprise
         Badges.MissionTerminee(dureeMission, erreursMission);
-        if (q.kind == QuestKind.ConditionIf) Badges.Logicien();
-        if (q.kind == QuestKind.Boucle)      Badges.Boucleur();
+        if (q.kind == QuestKind.ConditionIf) Badges.Logicien();  // chapitre 2
+        if (q.kind == QuestKind.Boucle)      Badges.Boucleur();  // chapitre 3 (dormant)
 
-        // Bannières de fin de chapitre (jalons du programme).
+        // Bannières de fin de chapitre.
         if      (questIndex == 5) BanniereChapitre.Afficher("CHAPITRE 1 TERMINÉ",
-                     "Les bases : variables, mémoire, affichage, saisie, calcul");
+                     "Les bases : variables, mémoire, affichage, saisie, calcul", "chap1");
         else if (questIndex == 6) BanniereChapitre.Afficher("CHAPITRE 2 TERMINÉ",
-                     "La condition if : VRAI ou FAUX, le programme choisit sa route");
-        else if (questIndex == 8) BanniereChapitre.Afficher("CHAPITRE 3 TERMINÉ",
-                     "Les boucles for et while : répéter jusqu'à ce que le test dise stop");
+                     "La condition if : un test, un booléen, une seule branche exécutée", "chap2");
 
         if (questIndex < quests.Count - 1) questIndex++;
         missionEtape = 0; // chaque mission repart à son étape 0
@@ -722,7 +862,8 @@ public class GameState : MonoBehaviour
         NotificationsUI.Afficher(
             $"LIGNE TERMINÉE   <color=#FFD24F>{etoiles}/3</color>",
             detail,
-            new Color(0f, 1f, 0.55f));
+            new Color(0f, 1f, 0.55f),
+            "note" + etoiles); // voix off : « trois sur trois, architecte élégant ! »
 
         EnregistrerStatLigne(questIndex, etoiles, duree, erreurs);
     }
@@ -815,12 +956,17 @@ public class GameState : MonoBehaviour
             missionRevelee = questIndex;
             DemarrerChronoMission();     // le chrono de la ligne démarre au briefing
             AudioFX.Succes();
-            VoiceOver.AnnoncerMission(); // la radio détaille la mission révélée
+            // La radio ne donne ses consignes qu'à la SORTIE du CPU (retour dans
+            // le monde) : on lit d'abord tranquillement, la voix guide ensuite.
+            _annonceALaSortie = true;
             MissionHUD.Refresh();
             ObjectiveMarker.Refresh();
             Sauvegarder();
         }
     }
+
+    // La réplique de mission est jouée quand le joueur RESSORT du CPU.
+    [System.NonSerialized] private bool _annonceALaSortie;
 
     // ── sauvegarde de progression (PlayerPrefs) ───────────────────────────
 
@@ -924,8 +1070,9 @@ public class GameState : MonoBehaviour
 
         Debug.Log($"[GameState] Progression chargée : mission {questIndex + 1}/{quests.Count}, {nbErreurs} erreur(s).");
 
-        // Campagne déjà terminée → on remontre le rating (et l'option Recommencer).
-        if (ToutesQuetesTerminees()) RatingScreen.Afficher();
+        // NB : si la campagne était déjà terminée, on NE remontre PAS l'écran de
+        // fin à chaque lancement — il n'apparaît qu'au moment où on termine.
+        // (Le joueur peut recommencer via le menu pause ou l'écran titre.)
     }
 
     /// <summary>Efface uniquement les clés de sauvegarde (sans relancer la scène).</summary>
@@ -981,6 +1128,7 @@ public class GameState : MonoBehaviour
         if (color.HasValue) boxColor = color.Value;
         boxMaterialAsset = mat;
         boxExists      = true;
+        boxEstValeur   = false;
         needsSpawn     = true;
         boxVientDeRam  = false; // box fraîchement déclarée, pas reprise de la RAM
     }
@@ -1028,18 +1176,11 @@ public class GameState : MonoBehaviour
         ConsommerBoxEnMain(); // la box quitte la main
         AudioFX.Depot();
 
-        // Badges liés au contenu de la RAM
-        int occupees = 0;
-        foreach (var slot in ramSlots) if (slot.filled) occupees++;
-        Badges.MemoireBienRemplie(occupees);
-
         // Missions validées par un dépôt en RAM
         var q = QueteActuelle();
         if (q != null && !q.complete)
         {
             if      (q.kind == QuestKind.SaisieEcran && missionEtape == 2 && nomDepose == "y")     CompleterQueteActuelle();
-            else if (q.kind == QuestKind.Parse       && missionEtape == 1 && nomDepose == "z")     CompleterQueteActuelle();
-            else if (q.kind == QuestKind.Calcul      && missionEtape == 2 && nomDepose == "somme") CompleterQueteActuelle();
             else if (q.kind == QuestKind.Boucle      && nomDepose == "i")
             {
                 // Tour de boucle accompli : i++ (retourne au CPU pour le test suivant).
@@ -1054,6 +1195,70 @@ public class GameState : MonoBehaviour
     }
 
     /// <summary>
+    /// ÉCRIT la valeur nue portée dans la variable de la case i — le joueur
+    /// CHOISIT la variable en cliquant sa boîte. Pour la ligne 3, seule y est
+    /// acceptée (c'est  y = Console.ReadLine();  ). Retourne (succès, message).
+    /// </summary>
+    public (bool ok, string message) DeposerValeurDansSlot(int i)
+    {
+        if (!boxExists || !boxEstValeur) return (false, "Aucune valeur en main.");
+        if (i < 0 || i >= ramSlots.Count || !ramSlots[i].filled)
+            return (false, "Cette case ne contient pas de variable.");
+
+        var s = ramSlots[i];
+        var q = QueteActuelle();
+
+        if (q != null && !q.complete && q.kind == QuestKind.SaisieEcran && missionEtape == 2)
+        {
+            if (s.variable != "y")
+            {
+                SignalerErreur();
+                return (false, $"Pas dans {s.variable} !  La ligne dit :  y = Console.ReadLine();");
+            }
+            s.value = boxValue; // la valeur devient LA valeur de y
+            ConsommerBoxEnMain();
+            AudioFX.Depot();
+            CompleterQueteActuelle();
+            Sauvegarder();
+            return (true, $"y = \"{s.value}\"   — la valeur a trouvé sa variable !");
+        }
+
+        // Ligne 4 : l'entier converti par le CPU va dans z.
+        if (q != null && !q.complete && q.kind == QuestKind.Parse && missionEtape == 2)
+        {
+            if (s.variable != "z")
+            {
+                SignalerErreur();
+                return (false, $"Pas dans {s.variable} !  La ligne dit :  z = Int32.Parse(y);");
+            }
+            s.value = boxValue; // z reçoit l'entier converti
+            ConsommerBoxEnMain();
+            AudioFX.Depot();
+            CompleterQueteActuelle();
+            Sauvegarder();
+            return (true, $"z = {s.value}   — l'entier converti est en mémoire !");
+        }
+
+        // Ligne 5 : le résultat de l'addition va dans somme.
+        if (q != null && !q.complete && q.kind == QuestKind.Calcul && missionEtape == 3)
+        {
+            if (s.variable != "somme")
+            {
+                SignalerErreur();
+                return (false, $"Pas dans {s.variable} !  La ligne dit :  somme = x + z;");
+            }
+            s.value = boxValue; // somme reçoit le résultat
+            ConsommerBoxEnMain();
+            AudioFX.Depot();
+            CompleterQueteActuelle();
+            Sauvegarder();
+            return (true, $"somme = {s.value}   — le résultat est en mémoire !");
+        }
+
+        return (false, "Rien à ranger ici pour l'instant.");
+    }
+
+    /// <summary>
     /// Prend une COPIE de la box de la case i (la case reste remplie, comme une
     /// vraie RAM : lire ne détruit pas). Le cube apparaît en main dans Main.
     /// </summary>
@@ -1062,17 +1267,21 @@ public class GameState : MonoBehaviour
         if (i < 0 || i >= ramSlots.Count || !ramSlots[i].filled) return;
 
         var s = ramSlots[i];
-        boxVariable      = s.variable;
+        // LIRE une variable = repartir avec une COPIE DE SA VALEUR (nue, sur la
+        // tête, colorée par le type). La boîte-variable, elle, RESTE en RAM.
+        boxVariable      = s.variable;               // provenance (pour les missions)
         boxValue         = s.value;
         boxType          = s.type;
-        boxColor         = s.color;
-        boxMaterialAsset = s.material;
+        boxColor         = CouleurType(s.type);
+        boxMaterialAsset = null;
         boxExists        = true;
+        boxEstValeur     = true;                     // juste la valeur, pas de boîte
         needsSpawn       = true;
         spawnDansLaMain  = true;
-        boxVientDeRam    = true; // reprise depuis la RAM
+        boxVientDeRam    = true; // copie lue depuis la RAM
 
-        // La case N'EST PAS vidée : on repart avec une copie.
+        AccorderGrace(); // lecture réussie : pas de message de redirection immédiat
+        // La case N'EST PAS vidée : lire ne détruit pas.
         Sauvegarder();
     }
 
@@ -1131,6 +1340,14 @@ public class GameState : MonoBehaviour
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (scene.name != mainSceneName) return;
+
+        // Retour dans le monde après la lecture au CPU → la radio donne les consignes.
+        if (_annonceALaSortie)
+        {
+            _annonceALaSortie = false;
+            VoiceOver.AnnoncerMission(0.8f);
+        }
+
         if (!needsSpawn || !boxExists)   return;
         SpawnBoxMaintenant();
     }
@@ -1165,6 +1382,10 @@ public class GameState : MonoBehaviour
     GameObject SpawnCubePhysique()
     {
         Vector3 pos = TrouverPointDeSpawn();
+
+        // VALEUR NUE : pas de boîte — juste la valeur, colorée par son type.
+        if (boxEstValeur) return SpawnValeurPhysique(pos);
+
         GameObject box;
 
         if (boxPrefab != null)
@@ -1174,7 +1395,8 @@ public class GameState : MonoBehaviour
             box.transform.localScale = Vector3.one * Mathf.Max(0.01f, boxScale);
             foreach (var sel in box.GetComponentsInChildren<RAMBoxSelector>(true)) Destroy(sel);
             AppliquerTextesBoite(box.transform);
-            TeinterBoite(box.transform, boxColor); // même couleur que la boîte en RAM
+            // Le carton reste en carton (comme les boîtes de type de la RAM) :
+            // seule la COULEUR DES TEXTES indique le type.
         }
         else
         {
@@ -1209,7 +1431,10 @@ public class GameState : MonoBehaviour
         var pi = box.GetComponent<PickupItem>() ?? box.AddComponent<PickupItem>();
         pi.itemId          = "data_" + boxVariable;
         pi.displayText     = boxValue;
-        pi.codeLabel       = $"{boxType} {boxVariable} = {boxValue};";
+        // Sans nom (valeur brute du clavier) : on n'affiche QUE la valeur.
+        pi.codeLabel       = string.IsNullOrEmpty(boxVariable)
+                             ? $"\"{boxValue}\""
+                             : $"{boxType} {boxVariable} = {boxValue};";
         pi.heldScaleFactor = 1f; // déjà à la bonne échelle
 
         AjouterLabelBoite(box.transform);
@@ -1296,15 +1521,60 @@ public class GameState : MonoBehaviour
         }
     }
 
-    /// <summary>Renseigne les textes 'nom' / 'valeur' / 'type' du prefab (s'ils existent).</summary>
+    /// <summary>
+    /// Une VALEUR nue portée sur la tête : JUSTE le texte de la valeur, à la
+    /// couleur de son type. Aucune boîte, aucune forme.
+    /// </summary>
+    GameObject SpawnValeurPhysique(Vector3 pos)
+    {
+        var racine = new GameObject($"Valeur_{boxValue}");
+        racine.transform.position = pos;
+
+        // La valeur, en gros, à la couleur du type — rien d'autre.
+        var txtGO = new GameObject("ValeurTexte");
+        txtGO.transform.SetParent(racine.transform, false);
+        txtGO.transform.localPosition = Vector3.up * 0.25f;
+        var tmp = txtGO.AddComponent<TextMeshPro>();
+        tmp.text      = boxType == "string" ? $"\"{boxValue}\"" : boxValue;
+        tmp.fontSize  = 6f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = boxColor;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.outlineWidth = 0.24f;
+        tmp.outlineColor = new Color32(0, 0, 0, 230);
+        tmp.rectTransform.sizeDelta = new Vector2(8f, 2f);
+        txtGO.AddComponent<LookAtCamera>();
+
+        // Collider + composants logiques (portage sur la tête, invisibles)
+        var col = racine.AddComponent<SphereCollider>();
+        col.radius = 0.35f;
+
+        var db = racine.AddComponent<DataBox>();
+        db.variableName = boxVariable; // "" = valeur sans nom
+        db.value        = boxValue;
+        db.typeName     = boxType;
+
+        var pi = racine.AddComponent<PickupItem>();
+        pi.itemId          = "val_" + boxValue;
+        pi.displayText     = boxValue;
+        pi.codeLabel       = $"\"{boxValue}\"";
+        pi.heldScaleFactor = 1f;
+
+        Debug.Log($"[GameState] Valeur nue en main : ({boxType}) \"{boxValue}\"");
+        return racine;
+    }
+
+    /// <summary>Renseigne les textes 'nom' / 'valeur' / 'type' du prefab, colorés
+    /// à la couleur officielle du type (même RGB que les boîtes de type).</summary>
     void AppliquerTextesBoite(Transform box)
     {
+        Color c = CouleurType(boxType);
         foreach (var tmp in box.GetComponentsInChildren<TMP_Text>(true))
         {
             string n = tmp.gameObject.name.Trim().ToLowerInvariant();
-            if      (n == "nom")    tmp.text = boxVariable;
-            else if (n == "valeur") tmp.text = boxValue;
-            else if (n == "type")   tmp.text = boxType;
+            if      (n == "nom")    { tmp.text = boxVariable; tmp.color = c; }
+            else if (n == "valeur") { tmp.text = boxValue;    tmp.color = c; }
+            else if (n == "type")   { tmp.text = boxType;     tmp.color = c; }
         }
     }
 
@@ -1319,8 +1589,9 @@ public class GameState : MonoBehaviour
         go.transform.localPosition = Vector3.up * 1.3f;
 
         var tmp = go.AddComponent<TextMeshPro>();
-        tmp.text      = string.IsNullOrEmpty(boxValue) ? $"{boxType} {boxVariable}"
-                                                       : $"{boxVariable} = {boxValue}";
+        tmp.text      = string.IsNullOrEmpty(boxVariable) ? $"\"{boxValue}\""              // valeur sans nom
+                      : string.IsNullOrEmpty(boxValue)    ? $"{boxType} {boxVariable}"     // variable vide
+                                                          : $"{boxVariable} = {boxValue}";
         tmp.fontSize  = 3f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color     = Color.white;

@@ -84,6 +84,17 @@ public class MemoryCell : MonoBehaviour
 
         if (AppuyeE())
         {
+            // ACCÈS CONTRÔLÉ : la RAM n'est accessible que si la mission t'y attend.
+            string attendue = gs.StationAttendue();
+            if (attendue != "ram" && attendue != "")
+            {
+                AudioFX.Erreur();
+                PromptUI.Show(gs.BriefingEnAttente()
+                    ? "<color=#FF6B6B>RAM verrouillée !</color>  Va d'abord au <b>CPU</b> lire la prochaine ligne."
+                    : $"<color=#FF6B6B>RAM verrouillée !</color>  Tu dois aller vers <b>{GameState.NomStation(attendue)}</b>.");
+                return;
+            }
+
             if (exigerBox && !gs.boxExists)
             {
                 Debug.Log("[MemoryCell] Pas de box → entrée refusée.");

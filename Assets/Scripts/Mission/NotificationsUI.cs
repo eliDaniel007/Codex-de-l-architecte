@@ -14,9 +14,10 @@ public class NotificationsUI : MonoBehaviour
 {
     public static NotificationsUI Instance { get; private set; }
 
-    private readonly Queue<(string titre, string message, Color accent)> _attente
-        = new Queue<(string, string, Color)>();
+    private readonly Queue<(string titre, string message, Color accent, string voix)> _attente
+        = new Queue<(string, string, Color, string)>();
     private bool _occupe;
+    private AudioSource _voix; // voix off des notifications
 
     private RectTransform   _carte;
     private CanvasGroup     _groupe;
@@ -32,11 +33,12 @@ public class NotificationsUI : MonoBehaviour
         }
     }
 
-    /// <summary>Empile une notification (titre court + message, couleur d'accent).</summary>
-    public static void Afficher(string titre, string message, Color? accent = null)
+    /// <summary>Empile une notification (titre + message + couleur d'accent).
+    /// 'voix' = nom d'un clip Resources/Voix lu en voix off (optionnel).</summary>
+    public static void Afficher(string titre, string message, Color? accent = null, string voix = null)
     {
         if (Instance == null) return;
-        Instance._attente.Enqueue((titre, message, accent ?? new Color(0f, 0.85f, 1f)));
+        Instance._attente.Enqueue((titre, message, accent ?? new Color(0f, 0.85f, 1f), voix));
         if (!Instance._occupe) Instance.StartCoroutine(Instance.Derouler());
     }
 
@@ -45,6 +47,8 @@ public class NotificationsUI : MonoBehaviour
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        _voix = gameObject.AddComponent<AudioSource>();
+        _voix.spatialBlend = 0f; // voix « dans l'oreille »
         BuildUI();
     }
 
@@ -53,11 +57,15 @@ public class NotificationsUI : MonoBehaviour
         _occupe = true;
         while (_attente.Count > 0)
         {
-            var (titre, message, accent) = _attente.Dequeue();
+            var (titre, message, accent, voix) = _attente.Dequeue();
             _titre.text        = titre;
             _message.text     = message;
             _barreAccent.color = accent;
             AudioFX.Succes();
+
+            // Voix off de la notification : via la FILE globale (jamais deux voix
+            // en même temps — elle attend aussi la fin de la radio des briefings).
+            if (!string.IsNullOrEmpty(voix)) FileVoix.Jouer(voix);
 
             // glisse depuis la droite
             for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / 0.3f)

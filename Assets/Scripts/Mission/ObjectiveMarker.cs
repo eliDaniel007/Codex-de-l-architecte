@@ -104,19 +104,20 @@ public class ObjectiveMarker : MonoBehaviour
                     _cible = (gs.boxExists && gs.boxVientDeRam) ? Ecran() : PortailRam();
                     break;
 
-                // 3. string y = Console.ReadLine() : déclarer y (RAM) → écran → ranger (RAM).
+                // 3. string y = Console.ReadLine() : déclarer y (RAM) → CLAVIER PRINCIPAL → ranger (RAM).
                 case QuestKind.SaisieEcran:
-                    _cible = (gs.missionEtape == 1) ? Ecran() : PortailRam();
+                    _cible = (gs.missionEtape == 1) ? ClavierPrincipal() : PortailRam();
                     break;
 
-                // 4. z = Int32.Parse(y) : y en main → CPU ; z en main → RAM ; sinon → RAM.
+                // 4. int z = Parse(y) : déclarer z (RAM) → valeur de y → CPU → ranger z (RAM).
                 case QuestKind.Parse:
-                    _cible = (gs.boxExists && gs.missionEtape == 0) ? TourCpu() : PortailRam();
+                    _cible = (gs.boxExists && gs.missionEtape == 1) ? TourCpu() : PortailRam();
                     break;
 
-                // 5. somme = x + z : x ou z en main → CPU ; somme en main → RAM ; sinon → RAM.
+                // 5. int somme = x + z : déclarer somme → valeurs x, z → CPU → ranger (RAM).
                 case QuestKind.Calcul:
-                    _cible = (gs.boxExists && gs.missionEtape <= 1) ? TourCpu() : PortailRam();
+                    _cible = (gs.boxExists && (gs.missionEtape == 1 || gs.missionEtape == 2))
+                             ? TourCpu() : PortailRam();
                     break;
 
                 // 7. if (somme > 50) : somme en main → CPU ; message en main → écran ; sinon → RAM.
@@ -180,6 +181,27 @@ public class ObjectiveMarker : MonoBehaviour
     {
         var e = FindFirstObjectByType<ConsoleScreen>();
         return e != null ? e.transform : null;
+    }
+
+    /// <summary>Le clavier PRINCIPAL des missions : le plus éloigné du portail RAM.</summary>
+    Transform ClavierPrincipal()
+    {
+        var claviers = FindObjectsByType<KeyboardTerminal>(FindObjectsSortMode.None);
+        if (claviers.Length == 0) return null;
+
+        var ram = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
+        if (ram == null) return claviers[0].transform;
+
+        Transform meilleur = claviers[0].transform;
+        float best = -1f;
+        foreach (var k in claviers)
+        {
+            Vector3 a = k.transform.position, b = ram.transform.position;
+            a.y = 0f; b.y = 0f;
+            float d = Vector3.Distance(a, b);
+            if (d > best) { best = d; meilleur = k.transform; }
+        }
+        return meilleur;
     }
 
     Transform ClavierLePlusProche()

@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Voix radio du « centre de contrôle » façon film d'espionnage :
@@ -13,6 +14,9 @@ public class VoiceOver : MonoBehaviour
 
     private AudioSource _src;
     private int         _derniereAnnonce = int.MinValue;
+
+    /// <summary>Vrai pendant qu'une réplique radio est jouée (la FileVoix attend).</summary>
+    public static bool EnTrainDeParler { get; private set; }
 
     public static void Ensure()
     {
@@ -69,6 +73,10 @@ public class VoiceOver : MonoBehaviour
 
     void AnnoncerOuvertureInterne()
     {
+        // Campagne déjà terminée : silence radio au lancement (la réplique
+        // « fin » ne joue qu'au moment où on termine la campagne).
+        if (GameState.I.ToutesQuetesTerminees()) return;
+
         if (GameState.I.BriefingEnAttente())
             JouerNomme("intro", 1.0f);     // « rends-toi au CPU pour tes objectifs »
         else
@@ -79,6 +87,10 @@ public class VoiceOver : MonoBehaviour
     {
         var gs = GameState.I;
 
+        // La ligne active n'a pas encore été LUE au CPU : la radio se tait
+        // (pas de consignes pour une ligne que le joueur n'a pas découverte).
+        if (!gs.ToutesQuetesTerminees() && gs.BriefingEnAttente()) return;
+
         string clipName;
         int    idx;
         if (gs.ToutesQuetesTerminees()) { clipName = "fin"; idx = int.MaxValue; }
@@ -87,10 +99,12 @@ public class VoiceOver : MonoBehaviour
         if (idx == _derniereAnnonce) return; // déjà annoncée
         _derniereAnnonce = idx;
 
-        JouerNomme(clipName, delai);
+        // Les consignes de mission (m1..m9) attendent que le joueur soit DANS
+        // LE MONDE : jamais pendant qu'il lit au CPU / RAM / clavier.
+        JouerNomme(clipName, delai, attendreMonde: clipName != "fin");
     }
 
-    void JouerNomme(string clipName, float delai)
+    void JouerNomme(string clipName, float delai, bool attendreMonde = false)
     {
         var clip = Resources.Load<AudioClip>("Voix/" + clipName);
         if (clip == null)
@@ -99,15 +113,30 @@ public class VoiceOver : MonoBehaviour
             return;
         }
         StopAllCoroutines();
-        StartCoroutine(JouerRadio(clip, delai));
+        EnTrainDeParler = false; // au cas où une réplique était interrompue
+        StartCoroutine(JouerRadio(clip, delai, attendreMonde));
     }
 
-    IEnumerator JouerRadio(AudioClip voix, float delai)
+    /// <summary>Vrai si le joueur est dans la MainScene (le monde 3D).</summary>
+    static bool DansLeMonde()
+    {
+        return SceneManager.GetActiveScene().name == GameState.I.mainSceneName;
+    }
+
+    IEnumerator JouerRadio(AudioClip voix, float delai, bool attendreMonde = false)
     {
         // Pas de radio tant que l'écran titre est affiché.
         yield return new WaitUntil(() => !EcranTitre.Visible);
         yield return new WaitForSeconds(delai);
 
+        // Les consignes n'interrompent JAMAIS la lecture au CPU (ou toute autre
+        // station) : on attend le retour dans le monde, et on laisse aussi les
+        // autres voix (notes, badges...) finir. On re-vérifie les deux jusqu'à
+        // ce que la voie soit vraiment libre.
+        while ((attendreMonde && !DansLeMonde()) || FileVoix.EnLecture)
+            yield return null;
+
+        EnTrainDeParler = true;
         _src.Stop();
         _src.PlayOneShot(Gresillement(0.35f), 0.5f);  // shrrr d'ouverture
         yield return new WaitForSeconds(0.42f);
@@ -116,6 +145,7 @@ public class VoiceOver : MonoBehaviour
         yield return new WaitForSeconds(voix.length + 0.05f);
 
         _src.PlayOneShot(Gresillement(0.18f), 0.35f); // shrr de fermeture
+        EnTrainDeParler = false;
     }
 
     /// <summary>Bruit blanc filtré : le grésillement radio.</summary>

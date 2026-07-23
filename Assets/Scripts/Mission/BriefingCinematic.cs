@@ -78,17 +78,24 @@ public class BriefingCinematic : MonoBehaviour
 
         if (_dejaJouee) return;
         if (EcranTitre.Visible) return; // le titre d'abord : il nous lancera à sa fermeture
+        if (CampagneDejaCommencee) { _dejaJouee = true; return; } // REPRENDRE ≠ recommencer
 
-        // Automatique à chaque lancement du jeu (une fois par session).
+        // Automatique au lancement d'une NOUVELLE campagne (une fois par session).
         _dejaJouee = true;
         StartCoroutine(Jouer());
     }
+
+    /// <summary>Vrai si le joueur a déjà commencé la campagne (sauvegarde en cours) :
+    /// en REPRENANT sa partie, il ne doit pas revoir la cinématique d'intro.</summary>
+    static bool CampagneDejaCommencee =>
+        GameState.I.missionRevelee >= 0 || GameState.I.questIndex > 0;
 
     /// <summary>Lance la cinématique après la fermeture de l'écran titre.</summary>
     public static void LancerApresTitre()
     {
         if (Instance == null || _dejaJouee) return;
         if (SceneManager.GetActiveScene().name != GameState.I.mainSceneName) return;
+        if (CampagneDejaCommencee) { _dejaJouee = true; return; } // reprise : pas d'intro
         _dejaJouee = true;
         Instance.StartCoroutine(Instance.Jouer());
     }

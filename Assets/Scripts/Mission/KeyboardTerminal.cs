@@ -1,5 +1,8 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// Pose ce script sur le modèle du clavier dans MainScene.
@@ -27,19 +30,15 @@ public class KeyboardTerminal : MonoBehaviour
     public bool  debug = false;
 
     private Transform _player;
-    private bool      _armed = true;
+    private bool      _estPrincipal = true; // le clavier LOIN de la RAM (celui des missions)
+    private bool      _promptAffiche;       // un message est affiché par CE clavier
     private float     _nextLog;
 
     void Start()
     {
         TrouverJoueur();
-
-        // Si on revient juste du clavier en étant déjà dans la zone, on désarme
-        // jusqu'à ce qu'on s'éloigne (évite la re-entrée en boucle).
-        if (_player != null && DistanceAuJoueur() <= triggerRadius)
-            _armed = false;
-
-        Debug.Log($"[KeyboardTerminal] Prêt sur '{name}' à {transform.position}. Rayon {triggerRadius} m. Cible : '{clavierSceneName}'.");
+        _estPrincipal = CalculerPrincipal();
+        Debug.Log($"[KeyboardTerminal] Prêt sur '{name}' (principal={_estPrincipal}). Rayon {triggerRadius} m.");
     }
 
     void TrouverJoueur()
@@ -57,17 +56,84 @@ public class KeyboardTerminal : MonoBehaviour
         if (debug && Time.time >= _nextLog)
         {
             _nextLog = Time.time + 1f;
-            Debug.Log($"[KeyboardTerminal] distance joueur = {dist:0.0} m (rayon {triggerRadius} m, armé={_armed})");
+            Debug.Log($"[KeyboardTerminal] distance joueur = {dist:0.0} m (rayon {triggerRadius} m)");
         }
 
-        if (!_armed)
+        // ── Ligne 3 : Console.ReadLine() se fait ICI — au clavier PRINCIPAL
+        //    (celui laissé sur la carte, loin de la RAM), pas au doublon.
+        var gs = GameState.I;
+        var q  = gs.QueteActuelle();
+        bool readLine = _estPrincipal && q != null && !q.complete &&
+                        q.kind == QuestKind.SaisieEcran && gs.missionEtape == 1 && !gs.boxExists;
+        bool proche = dist <= triggerRadius * 1.4f;
+
+        if (readLine)
         {
-            if (dist > triggerRadius * 1.5f) _armed = true;   // hystérésis
-            return;
+            if (proche)
+            {
+                PromptUI.Show("[E]  <color=#00D9FF>Console.ReadLine()</color>  —  récupérer la valeur tapée par l'utilisateur");
+                _promptAffiche = true;
+                if (AppuyeE()) RecevoirReadLine();
+            }
+            else if (_promptAffiche) { PromptUI.Hide(); _promptAffiche = false; }
+        }
+        else if (_estPrincipal)
+        {
+            // MAUVAISE STATION : le joueur vient au clavier alors que la mission
+            // l'attend ailleurs → message d'orientation. PAS pendant la période
+            // de grâce (il vient peut-être de réussir une interaction ici même).
+            string attendue = gs.StationAttendue();
+            if (proche && !gs.EnGrace && attendue != "clavier" && attendue != "")
+            {
+                PromptUI.Show($"<color=#FF6B6B>Rien à faire au clavier !</color>  Va plutôt vers <b>{GameState.NomStation(attendue)}</b>.");
+                _promptAffiche = true;
+            }
+            else if (!proche && _promptAffiche) { PromptUI.Hide(); _promptAffiche = false; }
         }
 
-        if (dist <= triggerRadius)
-            EntrerClavier();
+        // Le TERMINAL DE DÉCLARATION est définitivement retiré : le clavier ne
+        // charge plus la scène Clavier. Les déclarations se font dans la RAM ;
+        // le clavier ne sert plus qu'au Console.ReadLine() de la ligne 3.
+    }
+
+    /// <summary>L'utilisateur a « tapé » une suite de chiffres : elle arrive en main
+    /// SANS nom (on ne sait pas encore que c'est y) — juste la valeur.</summary>
+    void RecevoirReadLine()
+    {
+        PromptUI.Hide();
+        string val = Random.Range(10, 100).ToString();
+        GameState.I.SaisirLigne(val);
+        Debug.Log($"[KeyboardTerminal] Console.ReadLine() → \"{val}\" (valeur sans nom en main).");
+    }
+
+    static bool AppuyeE()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.E);
+#endif
+    }
+
+    /// <summary>Vrai si CE clavier est le principal : le plus ÉLOIGNÉ du portail RAM.</summary>
+    bool CalculerPrincipal()
+    {
+        var tous = FindObjectsByType<KeyboardTerminal>(FindObjectsSortMode.None);
+        if (tous.Length <= 1) return true;
+
+        var ram = FindFirstObjectByType<LoadSceneOnPlayerEnter>();
+        if (ram == null) return true;
+
+        KeyboardTerminal meilleur = null;
+        float best = -1f;
+        foreach (var k in tous)
+        {
+            Vector3 a = k.transform.position, b = ram.transform.position;
+            a.y = 0f; b.y = 0f;
+            float d = Vector3.Distance(a, b);
+            if (d > best) { best = d; meilleur = k; }
+        }
+        return meilleur == this;
     }
 
     float DistanceAuJoueur()
@@ -76,14 +142,6 @@ public class KeyboardTerminal : MonoBehaviour
         Vector3 b = transform.position;
         if (ignorerHauteur) { a.y = 0f; b.y = 0f; }
         return Vector3.Distance(a, b);
-    }
-
-    void EntrerClavier()
-    {
-        _armed = false;
-        GameState.I.clavierJustVisited = true;
-        Debug.Log($"[KeyboardTerminal] Joueur à portée → chargement de '{clavierSceneName}'");
-        SceneManager.LoadScene(clavierSceneName);
     }
 
     void OnDrawGizmos()

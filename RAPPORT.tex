@@ -1,0 +1,554 @@
+\documentclass[12pt,a4paper]{article}
+
+% ------------------------------------------------------------------
+%  Le Codex de l'Architecte — Rapport de projet
+%  Compilation : pdflatex RAPPORT.tex  (deux fois pour la table des matières)
+% ------------------------------------------------------------------
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+% ---- Couleurs du thème -------------------------------------------
+\definecolor{cpucyan}{RGB}{0,150,190}
+\definecolor{ualorange}{RGB}{200,120,30}
+\definecolor{grisdoux}{RGB}{90,100,115}
+\definecolor{fondcode}{RGB}{245,247,250}
+
+% ---- En-têtes / pieds de page ------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\itshape Le Codex de l'Architecte}
+\rhead{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---- Titres de section -------------------------------------------
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{cpucyan}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{1em}{}
+
+% ---- Style des blocs de code -------------------------------------
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{fondcode},
+  frame=single,
+  rulecolor=\color{grisdoux},
+  breaklines=true,
+  keepspaces=true,
+  columns=fullflexible,
+  language=,
+  showstringspaces=false,
+  xleftmargin=1em,
+  aboveskip=1em,belowskip=1em
+}
+
+% ---- Emplacement pour capture d'écran ----------------------------
+% Remplacer le contenu par \includegraphics[width=0.9\linewidth]{fichier}
+\newcommand{\capture}[1]{%
+  \begin{center}
+  \fbox{\parbox[c][3.2cm][c]{0.9\linewidth}{\centering
+    \color{grisdoux}\itshape [Emplacement capture d'écran]\\[2mm]#1}}
+  \end{center}}
+
+% ==================================================================
+\begin{document}
+
+% ------------------------------------------------------------------
+%  Page de titre
+% ------------------------------------------------------------------
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries Le Codex de l'Architecte\par}
+  \vspace{0.6cm}
+  {\Large Jeu vidéo éducatif pour l'apprentissage\\[2mm]de la programmation\par}
+  \vspace{2cm}
+  {\large\itshape Rapport de projet\par}
+  \vspace{3cm}
+  \begin{tabular}{rl}
+    \textbf{Auteur} & : \dots\dots\dots\dots\dots\dots \\[3mm]
+    \textbf{Établissement} & : \dots\dots\dots\dots\dots\dots \\[3mm]
+    \textbf{Encadrant} & : \dots\dots\dots\dots\dots\dots \\[3mm]
+    \textbf{Année académique} & : \dots\dots\dots\dots\dots\dots \\
+  \end{tabular}
+  \vfill
+  {\large Développé avec Unity — Moteur de jeu\par}
+\end{titlepage}
+
+% ------------------------------------------------------------------
+%  Table des matières
+% ------------------------------------------------------------------
+\tableofcontents
+\thispagestyle{empty}
+\clearpage
+
+% ==================================================================
+\section{Introduction — Pourquoi ce projet ?}
+
+L'apprentissage de la programmation est l'un des plus grands obstacles rencontrés
+par les étudiants en première année d'informatique. Non pas parce que la syntaxe
+d'un langage serait insurmontable, mais parce que les \textbf{concepts
+fondamentaux restent abstraits} : qu'est-ce qu'une variable ? Où « vit »
+réellement une donnée ? Que se passe-t-il, concrètement, lorsqu'on écrit
+\texttt{int x = 4;} ou \texttt{z = Int32.Parse(y);} ? Pour beaucoup, le code
+reste une suite d'incantations dont le fonctionnement interne demeure invisible.
+
+L'idée de ce projet est née de ce constat. Nous avons voulu créer un outil qui
+\textbf{rende visible et tangible} ce qui se passe à l'intérieur de la machine
+lorsqu'un programme s'exécute. Plutôt que d'expliquer la mémoire vive avec un
+schéma au tableau, pourquoi ne pas laisser l'étudiant \textbf{s'y promener} ?
+Plutôt que de décrire le rôle du processeur, pourquoi ne pas l'y faire
+\textbf{entrer} ?
+
+C'est ainsi qu'est né \emph{Le Codex de l'Architecte} : un \textbf{jeu vidéo
+éducatif en 3D} dans lequel le joueur incarne un agent miniaturisé, parachuté sur
+une \textbf{carte mère géante}. Sa mission : exécuter physiquement un programme,
+ligne après ligne, en se déplaçant entre les différents composants de
+l'ordinateur — la \textbf{RAM} où sont rangées les variables, le \textbf{CPU} qui
+lit et calcule, l'\textbf{écran} qui affiche, le \textbf{clavier} qui reçoit la
+saisie de l'utilisateur.
+
+L'objectif pédagogique est double :
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Ancrer les concepts par l'action.} En transportant lui-même une
+  valeur du clavier jusqu'à la mémoire, l'étudiant comprend viscéralement la
+  différence entre une \emph{variable} (un contenant qui reste en mémoire) et une
+  \emph{valeur} (le contenu, qui voyage). Cette distinction, souvent source de
+  confusion, devient une évidence physique.
+  \item \textbf{Dédramatiser l'erreur et motiver.} Le jeu guide, corrige avec
+  bienveillance (l'« humour de l'OS »), récompense la progression par des badges
+  et un système de notation, et transforme un cours parfois intimidant en une
+  aventure.
+\end{itemize}
+
+Le public cible est l'\textbf{étudiant débutant} en informatique, mais l'approche
+se veut suffisamment ludique pour intéresser un public plus large et plus jeune.
+
+\capture{L'écran-titre du jeu}
+
+% ==================================================================
+\section{Recherche et conception}
+
+Avant d'écrire la première ligne de code, une phase de recherche et de réflexion
+a été nécessaire pour poser des bases solides.
+
+\subsection{Étude de l'existant}
+
+Nous avons d'abord étudié les jeux et outils éducatifs qui abordent la
+programmation, afin d'en tirer les bonnes idées et d'en éviter les écueils :
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Human Resource Machine} et \textbf{7 Billion Humans} (Tomorrow
+  Corporation) — des puzzles où l'on programme de petits personnages avec des
+  instructions élémentaires. Ils démontrent qu'il est possible d'enseigner
+  l'algorithmique (variables, boucles, conditions) sans jamais afficher de code
+  intimidant, en passant par la manipulation d'objets. Ce fut une inspiration
+  majeure pour l'idée de \textbf{manipuler physiquement les données}.
+  \item \textbf{Shenzhen I/O} et \textbf{TIS-100} (Zachtronics) — des jeux qui
+  plongent le joueur dans l'architecture matérielle (registres, mémoire,
+  entrées/sorties). Ils nous ont confortés dans l'idée qu'une \textbf{métaphore
+  matérielle} (la carte mère, le CPU, la RAM) est à la fois juste et
+  pédagogiquement puissante.
+  \item \textbf{CodeCombat}, \textbf{Scratch} — des approches plus scolaires, qui
+  montrent l'importance d'une \textbf{progression graduelle} et d'un
+  accompagnement constant du débutant.
+\end{itemize}
+
+De cette étude, nous avons retenu trois principes directeurs :
+\begin{enumerate}[leftmargin=1.6em]
+  \item rendre les concepts \textbf{physiques et manipulables} ;
+  \item \textbf{cacher la complexité} du langage derrière des actions concrètes ;
+  \item \textbf{accompagner} le joueur pas à pas, sans jamais le laisser bloqué.
+\end{enumerate}
+
+\subsection{Choix de la plateforme de développement}
+
+Plusieurs moteurs de jeu ont été envisagés :
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{@{}l X l@{}}
+\toprule
+\textbf{Moteur} & \textbf{Caractéristiques} & \textbf{Décision} \\
+\midrule
+\textbf{Unity} & Écosystème mûr, langage C\# (cohérent avec le sujet enseigné),
+immense documentation, gratuit pour un usage éducatif, multiplateforme &
+\textbf{Retenu} \\
+Unreal Engine & Rendu photoréaliste, mais surdimensionné et C++ plus lourd &
+Écarté \\
+Godot & Léger, open source, mais écosystème moins fourni à l'époque du choix &
+Écarté \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Le choix s'est porté sur \textbf{Unity} (version 6000.4.3f1, dite « Unity 6 »),
+avec le pipeline de rendu \textbf{URP} (Universal Render Pipeline) et le nouveau
+système d'entrées (\emph{New Input System}). Un argument décisif : Unity utilise
+le \textbf{C\#}, c'est-à-dire précisément le langage que le jeu cherche à
+enseigner — une cohérence appréciable.
+
+\subsection{Choix des ressources (assets)}
+
+Pour le personnage et ses déplacements, nous avons adopté le pack officiel
+\textbf{Starter Assets — ThirdPersonController} de Unity (contrôleur à la
+troisième personne, animations, caméra \textbf{Cinemachine}). Cela a permis de
+disposer immédiatement d'un personnage jouable et de concentrer l'effort sur le
+cœur pédagogique du jeu.
+
+Pour les éléments de décor et les objets manipulés (les boîtes-variables, le
+modèle de RAM, le clavier, l'écran plat, le processeur, le portail), des modèles
+3D libres ont été importés. \textbf{Un principe fort a toutefois guidé le
+développement : tout ce qui pouvait être généré par code l'a été} — l'interface,
+le décor de la carte mère, les sons, la musique, la clôture de l'environnement.
+Ce choix a rendu le projet \textbf{quasi sans dépendances externes} : il suffit
+de cloner le dépôt et d'ouvrir Unity pour que tout fonctionne.
+
+\subsection{Maquettes et validation}
+
+Avant le développement complet, des \textbf{maquettes} (prototypes fonctionnels)
+ont été réalisées pour matérialiser l'idée : une première scène où le joueur se
+déplace, un premier prototype de « boîte-variable », un embryon de RAM. Ces
+maquettes ont été présentées au professeur encadrant afin de \textbf{valider la
+direction} avant d'investir des mois de développement. Cette validation obtenue,
+le développement à proprement parler a pu commencer.
+
+\capture{Une des premières maquettes}
+
+% ==================================================================
+\section{Développement du jeu}
+
+Cette partie constitue le cœur du projet. Elle s'est étalée sur \textbf{plusieurs
+mois} et représente la charge de travail la plus importante. Nous la détaillerons
+selon quatre axes : l'architecture technique, le concept pédagogique central, la
+structure du jeu, et enfin le contenu.
+
+\subsection{Architecture technique générale}
+
+Le projet est organisé autour d'un \textbf{script central, \texttt{GameState}},
+implémenté en \emph{singleton} persistant (patron \emph{singleton} +
+\texttt{DontDestroyOnLoad}). Ce composant survit aux changements de scène et
+centralise \textbf{tout l'état du jeu} : ce que le joueur porte, le contenu de la
+mémoire, la progression dans le programme, le score, la sauvegarde. Toutes les
+autres briques du jeu consultent et modifient cet état unique, ce qui évite les
+incohérences.
+
+Autour de ce noyau gravitent des \textbf{composants autonomes}, chacun
+responsable d'un système précis et créé automatiquement au lancement :
+interface (HUD, marqueur d'objectif, journal, notifications, menu pause,
+minimap), audio (voix radio, humour de l'OS, musique), décor (clôture, composants
+de carte mère, easter egg) et aide (le drone d'assistance).
+
+Chaque système suit le même patron : une méthode statique \texttt{Ensure()} qui
+le crée s'il n'existe pas, et un \texttt{Awake()} qui garantit l'unicité. Cette
+régularité rend le code \textbf{prévisible et facile à étendre} — un point
+important pour un projet destiné à être repris et poursuivi.
+
+Le jeu est découpé en \textbf{cinq scènes} reliées entre elles :
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textbf{Scène} & \textbf{Rôle} \\
+\midrule
+\texttt{MainScene} & Le monde ouvert (la carte mère) où le joueur se déplace \\
+\texttt{RAM} & La mémoire vive : déclaration, lecture et écriture des variables \\
+\texttt{CPU} & L'\textbf{unité de contrôle} : lit le programme, révèle les instructions \\
+\texttt{Calculateur} & L'\textbf{unité arithmétique et logique} : conversions, calculs, tests \\
+\texttt{Clavier} & Le terminal de saisie (\texttt{Console.ReadLine}) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\capture{Vue d'ensemble de la carte mère (MainScene)}
+
+\subsection{Le concept pédagogique central : variable \texorpdfstring{$\neq$}{different de} valeur}
+
+Toute la conception du gameplay repose sur une \textbf{distinction fondamentale},
+exigée par la rigueur pédagogique :
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
+\toprule
+ & \textbf{Variable (une boîte)} & \textbf{Valeur (un contenu)} \\
+\midrule
+Où vit-elle ? & Dans la RAM, qu'elle ne quitte jamais & Elle voyage sur la tête du joueur \\
+Représentation & Une boîte en carton (nom, type, valeur) & Juste le texte, coloré selon le type \\
+Naissance & Par une déclaration (type, nom) & Lecture, saisie clavier, ou calcul \\
+Lire & Cliquer la boîte → copie de sa valeur & — \\
+Écrire (affectation) & Arriver avec une valeur, cliquer la variable & — \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Ce modèle rend concrets des mécanismes qui restent d'ordinaire abstraits : une
+\textbf{déclaration} réserve une case mémoire ; \textbf{lire} une variable ne la
+détruit pas (on n'emporte qu'une copie) ; une \textbf{affectation} remplace le
+contenu ; et le \textbf{CPU ne manipule que des valeurs}, jamais des boîtes — car
+un processeur calcule sur des données, pas sur des emplacements mémoire.
+
+Chaque \textbf{type} possède sa couleur (\texttt{int} en rouge, \texttt{float} en
+magenta, \texttt{string} en bleu, \texttt{bool} en noir, \texttt{char} en bleu
+clair), et cette couleur suit la valeur partout où elle va.
+
+\capture{Le joueur portant une valeur ; une variable dans la RAM}
+
+\subsection{Le CPU en deux unités}
+
+Fidèle à l'architecture réelle d'un processeur, le CPU est scindé en \textbf{deux
+unités visuellement distinctes} :
+
+\begin{itemize}[leftmargin=1.4em]
+  \item l'\textbf{\textcolor{cpucyan}{unité de contrôle}} — c'est là que le joueur
+  \textbf{lit le programme} ; chaque instruction lui est révélée une à une,
+  l'obligeant à revenir consulter le CPU avant d'agir (comme un processeur qui
+  charge l'instruction suivante) ;
+  \item l'\textbf{\textcolor{ualorange}{unité arithmétique et logique (UAL)}} —
+  c'est là que s'effectuent les \textbf{conversions, additions et tests}. Fait
+  notable : l'UAL \textbf{ignore la provenance et la destination} des données ;
+  elle affiche seulement \texttt{... + ...}, jamais \texttt{somme = ...}, car un
+  additionneur ne fait qu'additionner — c'est le programme qui sait où ira le
+  résultat.
+\end{itemize}
+
+Cette séparation, matérialisée par des couleurs, des bandeaux et des filigranes
+opposés, ancre une notion d'architecture des ordinateurs souvent négligée.
+
+\capture{L'unité de contrôle et l'unité arithmétique}
+
+\subsection{Le programme du chapitre 1 (les six lignes de base)}
+
+Le premier chapitre fait exécuter au joueur un programme complet de six lignes,
+qui couvre les fondamentaux :
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textbf{Ligne} & \textbf{Concept enseigné} \\
+\midrule
+\texttt{int x = 4;} & La \textbf{déclaration} d'une variable \\
+\texttt{Console.WriteLine(x);} & L'\textbf{affichage} d'une valeur \\
+\texttt{string y = Console.ReadLine();} & La \textbf{saisie} utilisateur au clavier \\
+\texttt{int z = Int32.Parse(y);} & La \textbf{conversion} de type (texte $\rightarrow$ entier) \\
+\texttt{int somme = x + z;} & Le \textbf{calcul} arithmétique \\
+\texttt{Console.WriteLine(somme);} & L'affichage du résultat \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Chaque ligne se décompose en \textbf{étapes} que le joueur franchit physiquement.
+Par exemple, la ligne 4 (\texttt{int z = Int32.Parse(y);}) se joue ainsi :
+(1)~déclarer la variable \texttt{z} dans la RAM ; (2)~aller lire la valeur de
+\texttt{y} et l'apporter à l'unité arithmétique, qui la convertit et rend un
+entier ; (3)~revenir ranger cet entier dans \texttt{z}. Le joueur \emph{vit} la
+conversion au lieu de la lire.
+
+Un détail pédagogique important : à la ligne 3, la valeur récupérée au clavier
+arrive \textbf{sans nom} — c'est seulement en la rangeant dans \texttt{y} qu'elle
+acquiert son identité, illustrant que \texttt{y = Console.ReadLine()} est une
+\textbf{affectation}.
+
+\capture{Le programme affiché sur le CPU}
+
+\subsection{Le chapitre 2 : la condition \texttt{if} — les deux portes}
+
+Le second chapitre introduit la \textbf{structure conditionnelle} avec une mise
+en scène marquante. La ligne à exécuter est :
+
+\begin{lstlisting}
+if (somme > 50) { Console.WriteLine("grand"); }
+else            { Console.WriteLine("petit"); }
+\end{lstlisting}
+
+Le déroulé pédagogique :
+\begin{enumerate}[leftmargin=1.6em]
+  \item Le joueur apporte la valeur de \texttt{somme} à l'unité arithmétique, qui
+  \textbf{évalue le test} sous ses yeux (\texttt{67 > 50} $\rightarrow$ VRAI) et
+  lui rend un \textbf{booléen} — matérialisant que le résultat d'une condition est
+  une valeur de type \texttt{bool}.
+  \item De retour dans le monde, \textbf{deux portes} se dressent devant l'écran :
+  l'une pour la branche \texttt{VRAI} $\rightarrow$ « grand », l'autre pour
+  \texttt{FAUX} $\rightarrow$ « petit ».
+  \item \textbf{Seule la porte correspondant au booléen s'ouvre.} L'autre est
+  murée : s'en approcher rappelle qu'une branche dont le test échoue ne s'exécute
+  jamais.
+  \item Traverser la bonne porte \textbf{exécute la branche} : l'écran affiche le
+  message.
+\end{enumerate}
+
+Comme la valeur de \texttt{somme} dépend du nombre aléatoire saisi au chapitre 1,
+\textbf{chaque partie emprunte une branche différente} — la meilleure
+démonstration possible de ce qu'est une condition.
+
+\capture{Les deux portes de la condition}
+
+\subsection{Les systèmes annexes}
+
+Autour de ce cœur pédagogique, de nombreux systèmes enrichissent l'expérience :
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{La voix radio.} Un « centre de contrôle » guide le joueur à chaque
+  instruction, avec une \textbf{voix neuronale de synthèse} (générée hors ligne),
+  bien plus naturelle qu'une voix robotique. Les consignes ne se déclenchent qu'à
+  la sortie du CPU, une fois l'instruction lue.
+  \item \textbf{Le guidage et le verrouillage.} Le joueur ne peut pas « sauter »
+  une étape : tant qu'il n'a pas lu la prochaine instruction au CPU, les stations
+  refusent d'interagir. S'il se trompe de station, un message le réoriente. Le
+  HUD, un marqueur d'objectif 3D et une minimap indiquent où aller.
+  \item \textbf{Le drone d'aide.} Un drone flottant, activable à la demande,
+  explique le concept de la ligne en cours et rappelle les règles.
+  \item \textbf{La progression.} Un système de \textbf{badges} (un par notion), de
+  \textbf{notation} par ligne et de \textbf{skins} débloquables récompense
+  l'apprentissage. Un \textbf{rapport élève} exportable permet au professeur de
+  suivre les progrès.
+  \item \textbf{L'ambiance.} Écran-titre avec caméra orbitale, cinématique
+  d'introduction, musique composée par code, décor procédural de carte mère,
+  clôture de l'environnement, et un \textbf{easter egg pédagogique} : un insecte
+  caché rappelant le premier « bug » de l'histoire de l'informatique (Grace
+  Hopper, 1947).
+  \item \textbf{L'accessibilité.} Un « mode Zen » retire la pression du
+  chronomètre, les messages d'erreur sont bienveillants, et l'ensemble est en
+  français.
+\end{itemize}
+
+\capture{Le HUD, la minimap, une notification, le drone d'aide}
+
+\subsection{Sauvegarde et robustesse}
+
+La progression du joueur (ligne courante, contenu de la mémoire, score, badges,
+réglages) est \textbf{sauvegardée automatiquement}. Le joueur peut quitter et
+\textbf{reprendre exactement où il s'était arrêté}, sans revoir la cinématique.
+Une grande attention a été portée à la robustesse : gestion des changements de
+scène, périodes de « grâce » pour éviter des messages intempestifs, compatibilité
+des anciennes sauvegardes lorsque le programme s'allonge.
+
+% ==================================================================
+\section{Difficultés rencontrées}
+
+Le développement, étalé sur plusieurs mois, n'a pas été sans obstacles :
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{La traduction d'un concept abstrait en gameplay.} La distinction
+  variable/valeur, évidente sur le papier, a demandé de \textbf{nombreuses
+  itérations} avant de trouver sa forme jouable. La solution — les variables
+  restent en RAM, seules les valeurs voyagent — n'a émergé qu'après plusieurs
+  refontes.
+  \item \textbf{La gestion de l'état entre cinq scènes.} Faire communiquer
+  proprement le monde, la RAM, le CPU, l'UAL et le clavier, tout en gardant un
+  état cohérent, a nécessité une architecture centralisée et de nombreux
+  ajustements (synchronisation, objets détruits au changement de scène).
+  \item \textbf{Les enchaînements audio et cinématiques.} Faire coïncider
+  l'écran-titre, la cinématique, la musique et la voix radio sans qu'ils se
+  chevauchent a demandé la mise en place d'une file d'attente vocale et d'un
+  séquencement précis.
+  \item \textbf{L'adaptation à l'affichage.} Le passage en plein écran révélait
+  des problèmes de cadrage, corrigés par une adaptation dynamique de la caméra.
+  \item \textbf{Des problèmes techniques ponctuels} : un fichier source Blender
+  bloquant l'import, des chevauchements de texte dans l'interface, des messages
+  mal synchronisés — autant de petits obstacles résolus un à un.
+\end{itemize}
+
+Chacune de ces difficultés a été l'occasion d'\textbf{apprendre} : sur Unity, sur
+l'architecture logicielle, et sur la conception pédagogique.
+
+% ==================================================================
+\section{Points d'amélioration}
+
+Le jeu, pleinement fonctionnel pour son objectif (le chapitre 1 et le début du
+chapitre 2), offre de nombreuses perspectives d'évolution :
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Le design visuel.} L'esthétique actuelle, largement générée par
+  code, est fonctionnelle mais perfectible. Un travail artistique (textures,
+  éclairage, effets) rendrait l'univers plus immersif.
+  \item \textbf{Le chapitre 2 et au-delà.} La condition \texttt{if} est en place ;
+  il reste à développer pleinement les \textbf{boucles} (\texttt{for},
+  \texttt{while}), dont la logique est déjà présente en réserve dans le code.
+  Au-delà, on pourrait aborder les tableaux, les fonctions, les objets.
+  \item \textbf{Enrichissement pédagogique.} Niveaux « bac à sable », défis
+  chronométrés, mode « débogueur » pas à pas.
+  \item \textbf{Diffusion.} Un export \textbf{WebGL} permettrait de jouer dans un
+  navigateur, sans installation — idéal en salle de classe.
+  \item \textbf{Accessibilité et internationalisation.} Sous-titres, mode
+  daltonien, traduction en plusieurs langues.
+\end{itemize}
+
+Ces pistes sont documentées afin qu'un futur développeur puisse \textbf{reprendre
+et poursuivre} le projet aisément.
+
+% ==================================================================
+\section{Conclusion}
+
+\emph{Le Codex de l'Architecte} est né d'une conviction : \textbf{on apprend mieux
+en faisant}. En transformant les concepts abstraits de la programmation —
+variables, mémoire, conversion, condition — en actions physiques au sein d'une
+carte mère géante, le jeu offre à l'étudiant débutant une compréhension
+\textbf{intuitive et durable} de ce qui se passe réellement lorsqu'un programme
+s'exécute.
+
+Le projet a représenté un travail conséquent, étalé sur plusieurs mois, mêlant
+\textbf{conception pédagogique}, \textbf{développement logiciel} et
+\textbf{création d'expérience}. Au-delà du résultat — un jeu jouable, guidé,
+récompensant —, il aura été une formidable occasion d'apprentissage : de Unity et
+du C\#, de l'architecture d'une application complète, et de l'art délicat de
+rendre l'abstrait tangible.
+
+Le socle est solide, l'architecture pensée pour l'extension, et les fondations du
+chapitre 2 posées. \emph{Le Codex de l'Architecte} ne demande qu'à grandir —
+chapitre après chapitre — pour accompagner toujours plus loin celles et ceux qui
+font leurs premiers pas dans le monde du code.
+
+\capture{L'écran de fin / le rating}
+
+% ==================================================================
+\section{Références}
+
+\subsection*{Documentation technique}
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Unity — Documentation officielle}, Unity Technologies.
+  \url{https://docs.unity3d.com}
+  \item \textbf{Unity — Universal Render Pipeline (URP)}.
+  \url{https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@latest}
+  \item \textbf{Unity — Input System}.
+  \url{https://docs.unity3d.com/Packages/com.unity.inputsystem@latest}
+  \item \textbf{Unity — Starter Assets: ThirdPerson}, Unity Asset Store.
+  \item \textbf{Unity — Cinemachine}, documentation.
+  \item \textbf{Microsoft — Documentation C\#} (types, \texttt{Console},
+  \texttt{Int32.Parse}). \url{https://learn.microsoft.com/dotnet/csharp}
+  \item \textbf{edge-tts} — synthèse vocale neuronale.
+  \url{https://pypi.org/project/edge-tts}
+\end{itemize}
+
+\subsection*{Jeux et outils ayant inspiré le projet}
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Human Resource Machine} / \textbf{7 Billion Humans} — Tomorrow
+  Corporation.
+  \item \textbf{Shenzhen I/O} / \textbf{TIS-100} — Zachtronics.
+  \item \textbf{CodeCombat} — CodeCombat Inc.
+  \item \textbf{Scratch} — MIT Media Lab.
+\end{itemize}
+
+\subsection*{Culture informatique}
+\begin{itemize}[leftmargin=1.4em]
+  \item L'anecdote du premier « bug » (papillon dans le Harvard Mark II, équipe de
+  \textbf{Grace Hopper}, 1947), reprise comme easter egg pédagogique.
+\end{itemize}
+
+\end{document}

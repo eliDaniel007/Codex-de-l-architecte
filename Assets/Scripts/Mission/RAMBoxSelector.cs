@@ -35,6 +35,17 @@ public class RAMBoxSelector : MonoBehaviour, IPointerClickHandler
 
     private void SelectAndReturn()
     {
+        // BRIEFING OBLIGATOIRE : tant que la prochaine ligne n'a pas été lue au
+        // CPU, la RAM refuse toute interaction — même si le joueur connaît la suite.
+        if (GameState.I.BriefingEnAttente())
+        {
+            RAMSceneController.Message(
+                "Retourne au CPU (unité de contrôle) lire la prochaine ligne",
+                false, 5f);
+            AudioFX.Erreur();
+            return;
+        }
+
         // Boîte décor (int box, float box, ...) = CHOIX DU TYPE : cliquer ouvre
         // le formulaire de déclaration avec ce type présélectionné.
         if (cellIndex < 0)
@@ -47,7 +58,36 @@ public class RAMBoxSelector : MonoBehaviour, IPointerClickHandler
             }
             return;
         }
+
+        var gs = GameState.I;
+
+        // Dialogue de confirmation déjà ouvert → on ignore les clics de boîtes.
+        if (RAMSceneController.ConfirmationOuverte) return;
+
+        // On PORTE une valeur nue → cliquer une variable = demander l'AFFECTATION.
+        if (gs.boxExists && gs.boxEstValeur)
+        {
+            string valeur = gs.boxValue;
+            RAMSceneController.DemanderConfirmation(
+                $"Déposer la valeur  <color=#00D9FF>\"{valeur}\"</color>  dans  <b>{variableName}</b>  ?",
+                () =>
+                {
+                    var (ok, message) = gs.DeposerValeurDansSlot(cellIndex);
+                    RAMSceneController.Message(message, ok);
+                    if (ok) StartCoroutine(RechargerApresDepot()); // sauvegarde déjà faite
+                });
+            return;
+        }
+
         StartCoroutine(PickupAnimation());
+    }
+
+    System.Collections.IEnumerator RechargerApresDepot()
+    {
+        // Petit délai (son + message lisible), puis la scène RAM se recharge :
+        // la boîte y affiche sa nouvelle valeur.
+        yield return new WaitForSeconds(1.1f);
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     /// <summary>Type représenté par une boîte décor (texte affiché ou nom d'un parent).</summary>

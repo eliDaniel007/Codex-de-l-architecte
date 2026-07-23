@@ -26,10 +26,15 @@ public class BanniereChapitre : MonoBehaviour
         }
     }
 
-    /// <summary>Affiche la bannière (titre doré + sous-titre) pendant ~3 s.</summary>
-    public static void Afficher(string titre, string sousTitre)
+    /// <summary>Affiche la bannière (titre doré + sous-titre) pendant ~3 s,
+    /// avec une voix off optionnelle (clip Resources/Voix).</summary>
+    public static void Afficher(string titre, string sousTitre, string voix = null)
     {
         if (Instance == null) return;
+
+        // Voix off via la FILE globale : elle passera après les autres voix.
+        if (!string.IsNullOrEmpty(voix)) FileVoix.Jouer(voix);
+
         Instance.StopAllCoroutines();
         Instance.StartCoroutine(Instance.Jouer(titre, sousTitre));
     }
